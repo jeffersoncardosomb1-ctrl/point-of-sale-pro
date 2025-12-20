@@ -100,18 +100,20 @@ export function useOrdersSupabase() {
         vendedor: string;
         formaPagamento: PaymentMethod;
         items: Omit<OrderItem, "id">[];
-        descontoManual?: number;
+        descontoManual?: number; // Added manual discount
       }
     ): Promise<Order | null> => {
       try {
-        const descontoManual = orderData.descontoManual || 0;
+        const manualDiscount = orderData.descontoManual || 0;
         
-        // Calculate totals
+        // Calculate totals before manual discount
         const totalBruto = orderData.items.reduce((sum, item) => sum + item.totalBruto, 0);
         const totalDescontoProdutos = orderData.items.reduce((sum, item) => sum + item.desconto, 0);
         const subtotalLiquido = orderData.items.reduce((sum, item) => sum + item.totalLiquido, 0);
-        const totalDesconto = totalDescontoProdutos + descontoManual;
-        const totalLiquido = Math.max(0, subtotalLiquido - descontoManual);
+
+        // Apply manual discount to overall order totals
+        const orderTotalDesconto = totalDescontoProdutos + manualDiscount;
+        const orderTotalLiquido = Math.max(0, subtotalLiquido - manualDiscount);
 
         // Insert order
         const { data: orderRow, error: orderError } = await supabase
@@ -121,9 +123,9 @@ export function useOrdersSupabase() {
             forma_pagamento: orderData.formaPagamento,
             status: "ATIVA",
             total_bruto: totalBruto,
-            total_desconto: totalDesconto,
-            total_liquido: totalLiquido,
-            valor_pago: totalLiquido,
+            total_desconto: orderTotalDesconto, // Use updated total discount
+            total_liquido: orderTotalLiquido,   // Use updated total liquido
+            valor_pago: orderTotalLiquido,      // Valor pago é o total líquido final
             troco: 0,
           })
           .select()
@@ -131,23 +133,35 @@ export function useOrdersSupabase() {
 
         if (orderError) throw orderError;
 
-        // Insert sales items linked to order
-        const salesInserts = orderData.items.map((item) => ({
-          order_id: orderRow.id,
-          vendedor: orderData.vendedor,
-          barcode: item.barcode,
-          product_name: item.productName,
-          quantidade: item.quantidade,
-          valor_unitario: item.valorUnitario,
-          desconto_percentual: item.descontoPercentual,
-          total_bruto: item.totalBruto,
-          desconto: item.desconto,
-          total_liquido: item.totalLiquido,
-          valor_pago: item.totalLiquido,
-          troco: 0,
-          forma_pagamento: orderData.formaPagamento,
-          status: "ATIVA" as const,
-        }));
+        // Prepare sales items, distributing manual discount proportionally
+        const salesInserts = orderData.items.map((item) => {
+          let itemDesconto = item.desconto;
+          let itemTotalLiquido = item.totalLiquido;
+
+          if (manualDiscount > 0 && subtotalLiquido > 0) {
+            const proportion = item.totalLiquido / subtotalLiquido;
+            const allocatedManualDiscount = manualDiscount * proportion;
+            itemDesconto += allocatedManualDiscount;
+            itemTotalLiquido -= allocatedManualDiscount;
+          }
+
+          return {
+            order_id: orderRow.id,
+            vendedor: orderData.vendedor,
+            barcode: item.barcode,
+            product_name: item.productName,
+            quantidade: item.quantidade,
+            valor_unitario: item.valorUnitario,
+            desconto_percentual: item.descontoPercentual, // Keep original percentage
+            total_bruto: item.totalBruto,
+            desconto: itemDesconto,         // Updated item discount
+            total_liquido: itemTotalLiquido, // Updated item total liquido
+            valor_pago: itemTotalLiquido,    // Valor pago para o item é o seu total líquido final
+            troco: 0,
+            forma_pagamento: orderData.formaPagamento,
+            status: "ATIVA" as const,
+          };
+        });
 
         const { data: salesData, error: salesError } = await supabase
           .from("sales")

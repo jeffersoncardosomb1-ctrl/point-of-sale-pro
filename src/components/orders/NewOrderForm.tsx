@@ -33,21 +33,25 @@ export function NewOrderForm({ onOrderCreated }: NewOrderFormProps) {
 
   const [items, setItems] = useState<OrderItem[]>([]);
   const [formaPagamento, setFormaPagamento] = useState<PaymentMethod>("PIX");
-  const [descontoManual, setDescontoManual] = useState<string>("");
+  const [descontoManualInput, setDescontoManualInput] = useState<string>(""); // Changed state name
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const vendedor = [firstName, lastName].filter(Boolean).join(" ") || "Vendedor";
 
-  const descontoManualValue = parseFloat(descontoManual.replace(",", ".")) || 0;
+  const descontoManualValue = parseFloat(descontoManualInput.replace(",", ".")) || 0; // Use new state name
 
   const totals = useMemo(() => {
     const totalBruto = items.reduce((sum, item) => sum + item.totalBruto, 0);
     const totalDescontoProdutos = items.reduce((sum, item) => sum + item.desconto, 0);
-    const subtotal = items.reduce((sum, item) => sum + item.totalLiquido, 0);
-    const totalDesconto = totalDescontoProdutos + descontoManualValue;
-    const totalLiquido = Math.max(0, subtotal - descontoManualValue);
-    return { totalBruto, totalDescontoProdutos, totalDesconto, totalLiquido, subtotal };
-  }, [items, descontoManualValue]);
+    const subtotalLiquido = items.reduce((sum, item) => sum + item.totalLiquido, 0); // Total líquido antes do desconto manual
+
+    const effectiveDescontoManual = formaPagamento === "DINHEIRO" ? descontoManualValue : 0; // Apply only for DINHEIRO
+
+    const totalDesconto = totalDescontoProdutos + effectiveDescontoManual;
+    const totalLiquido = Math.max(0, subtotalLiquido - effectiveDescontoManual);
+    
+    return { totalBruto, totalDescontoProdutos, totalDesconto, totalLiquido, subtotalLiquido };
+  }, [items, formaPagamento, descontoManualValue]); // Add formaPagamento to dependencies
 
   function handleAddItem(item: OrderItem) {
     setItems((prev) => [...prev, item]);
@@ -60,7 +64,7 @@ export function NewOrderForm({ onOrderCreated }: NewOrderFormProps) {
   function handleClearAll() {
     setItems([]);
     setFormaPagamento("PIX");
-    setDescontoManual("");
+    setDescontoManualInput(""); // Reset manual discount input
   }
 
   async function handleSubmit() {
@@ -75,7 +79,7 @@ export function NewOrderForm({ onOrderCreated }: NewOrderFormProps) {
         vendedor,
         formaPagamento,
         items: items.map(({ id, ...rest }) => rest),
-        descontoManual: formaPagamento === "DINHEIRO" ? descontoManualValue : 0,
+        descontoManual: formaPagamento === "DINHEIRO" ? descontoManualValue : 0, // Pass effective manual discount
       });
 
       if (result) {
@@ -109,7 +113,7 @@ export function NewOrderForm({ onOrderCreated }: NewOrderFormProps) {
               <Label htmlFor="formaPagamento">Forma de pagamento</Label>
               <Select value={formaPagamento} onValueChange={(v) => {
                 setFormaPagamento(v as PaymentMethod);
-                if (v !== "DINHEIRO") setDescontoManual("");
+                if (v !== "DINHEIRO") setDescontoManualInput(""); // Clear manual discount if not cash
               }}>
                 <SelectTrigger id="formaPagamento">
                   <SelectValue />
@@ -128,15 +132,15 @@ export function NewOrderForm({ onOrderCreated }: NewOrderFormProps) {
               <div className="flex-1 space-y-2">
                 <Label htmlFor="descontoManual" className="flex items-center gap-2">
                   <Banknote className="h-4 w-4" />
-                  Desconto manual (troco)
+                  Desconto manual (R$)
                 </Label>
                 <Input
                   id="descontoManual"
                   type="text"
                   inputMode="decimal"
                   placeholder="0,00"
-                  value={descontoManual}
-                  onChange={(e) => setDescontoManual(e.target.value)}
+                  value={descontoManualInput} // Use new state name
+                  onChange={(e) => setDescontoManualInput(e.target.value)} // Use new state name
                   className="font-mono"
                 />
               </div>
@@ -186,10 +190,10 @@ export function NewOrderForm({ onOrderCreated }: NewOrderFormProps) {
               <span className="text-muted-foreground">Desconto produtos</span>
               <span className="font-medium text-destructive">-{formatBRL(totals.totalDescontoProdutos)}</span>
             </div>
-            {formaPagamento === "DINHEIRO" && descontoManualValue > 0 && (
+            {formaPagamento === "DINHEIRO" && totals.totalDesconto - totals.totalDescontoProdutos > 0.001 && ( // Check if manual discount is applied
               <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground">Desconto manual</span>
-                <span className="font-medium text-destructive">-{formatBRL(descontoManualValue)}</span>
+                <span className="font-medium text-destructive">-{formatBRL(totals.totalDesconto - totals.totalDescontoProdutos)}</span>
               </div>
             )}
             <div className="flex justify-between text-sm border-t pt-2">
