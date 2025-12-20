@@ -25,23 +25,50 @@ serve(async (req) => {
     const html = await response.text();
 
     let productName = null;
-    // Tentativa de extrair o nome do produto de tags h2 ou h3
-    // Esta é uma abordagem de web scraping básica e pode ser frágil se a estrutura do site mudar.
-    const h2Match = html.match(/<h2[^>]*>(.*?)<\/h2>/i);
-    if (h2Match && h2Match[1]) {
-      productName = h2Match[1].replace(/<[^>]*>/g, '').trim();
-      if (productName.toLowerCase().includes("resultados da pesquisa") || productName.toLowerCase().includes("search results")) {
-        productName = null; // Ignorar títulos genéricos de resultados de busca
+
+    // Helper to extract text from a tag and filter generic search results
+    const extractTextFromTag = (htmlContent: string, tagName: string): string[] => {
+      const regex = new RegExp(`<${tagName}[^>]*>(.*?)</${tagName}>`, 'gi');
+      const matches = [...htmlContent.matchAll(regex)];
+      return matches
+        .map(match => match[1].replace(/<[^>]*>/g, '').trim())
+        .filter(text => text && 
+          !text.toLowerCase().includes("resultados da pesquisa") && 
+          !text.toLowerCase().includes("search results") &&
+          !text.toLowerCase().includes("product search") // Added another generic term
+        );
+    };
+
+    // 1. Try to extract from <title> tag first
+    const titleMatch = html.match(/<title[^>]*>(.*?)<\/title>/i);
+    if (titleMatch && titleMatch[1]) {
+      const titleText = titleMatch[1].replace(/<[^>]*>/g, '').trim();
+      if (!titleText.toLowerCase().includes("resultados da pesquisa") && 
+          !titleText.toLowerCase().includes("search results") &&
+          !titleText.toLowerCase().includes("product search")) {
+        productName = titleText;
+      }
+    }
+
+    // 2. If not found or generic, try h1, h2, h3 tags (first non-generic one)
+    if (!productName) {
+      const h1Texts = extractTextFromTag(html, 'h1');
+      if (h1Texts.length > 0) {
+        productName = h1Texts[0];
+      }
+    }
+
+    if (!productName) {
+      const h2Texts = extractTextFromTag(html, 'h2');
+      if (h2Texts.length > 0) {
+        productName = h2Texts[0];
       }
     }
     
     if (!productName) {
-      const h3Match = html.match(/<h3[^>]*>(.*?)<\/h3>/i);
-      if (h3Match && h3Match[1]) {
-        productName = h3Match[1].replace(/<[^>]*>/g, '').trim();
-        if (productName.toLowerCase().includes("resultados da pesquisa") || productName.toLowerCase().includes("search results")) {
-          productName = null;
-        }
+      const h3Texts = extractTextFromTag(html, 'h3');
+      if (h3Texts.length > 0) {
+        productName = h3Texts[0];
       }
     }
 
