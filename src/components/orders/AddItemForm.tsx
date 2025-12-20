@@ -1,5 +1,5 @@
-import { useState, useMemo } from "react";
-import { Plus, Camera, Trash2 } from "lucide-react";
+import { useState, useMemo, useEffect } from "react";
+import { Plus, Camera, Trash2, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -7,6 +7,7 @@ import { ScannerModal } from "@/components/sales/ScannerModal";
 import { OrderItem } from "@/types/order";
 import { safeNumber, uuid } from "@/lib/sales-utils";
 import { toast } from "@/hooks/use-toast";
+import { buscarProdutoPorEAN } from "@/lib/product-search"; // Importar a nova função
 
 interface AddItemFormProps {
   onAddItem: (item: OrderItem) => void;
@@ -19,6 +20,7 @@ export function AddItemForm({ onAddItem }: AddItemFormProps) {
   const [valorUnitario, setValorUnitario] = useState("");
   const [descontoPercentual, setDescontoPercentual] = useState("");
   const [scannerOpen, setScannerOpen] = useState(false);
+  const [isSearchingProduct, setIsSearchingProduct] = useState(false); // Novo estado para loading
 
   const calc = useMemo(() => {
     const qt = safeNumber(quantidade);
@@ -29,6 +31,36 @@ export function AddItemForm({ onAddItem }: AddItemFormProps) {
     const totalLiquido = totalBruto - desconto;
     return { totalBruto, desconto, totalLiquido };
   }, [quantidade, valorUnitario, descontoPercentual]);
+
+  // Efeito para buscar o produto quando o código de barras muda
+  useEffect(() => {
+    const searchProduct = async () => {
+      const trimmedBarcode = barcode.trim();
+      if (trimmedBarcode.length > 7) { // EANs geralmente têm 8, 12 ou 13 dígitos
+        setIsSearchingProduct(true);
+        setProductName(""); // Limpa o nome anterior enquanto busca
+        const result = await buscarProdutoPorEAN(trimmedBarcode);
+        if (result.encontrado && result.nome) {
+          setProductName(result.nome);
+          toast({ title: "Produto encontrado!", description: result.nome });
+        } else {
+          toast({ title: "Produto não encontrado", description: "Por favor, digite o nome do produto manualmente.", variant: "info" });
+        }
+        setIsSearchingProduct(false);
+      } else if (trimmedBarcode.length === 0) {
+        setProductName(""); // Limpa o nome se o código de barras for apagado
+      }
+    };
+
+    const handler = setTimeout(() => {
+      searchProduct();
+    }, 500); // Pequeno delay para evitar múltiplas buscas enquanto o usuário digita
+
+    return () => {
+      clearTimeout(handler);
+      setIsSearchingProduct(false); // Limpa o estado de loading ao desmontar ou antes de uma nova busca
+    };
+  }, [barcode]);
 
   function resetForm() {
     setBarcode("");
@@ -113,7 +145,11 @@ export function AddItemForm({ onAddItem }: AddItemFormProps) {
             placeholder="Ex: Camiseta Básica P"
             value={productName}
             onChange={(e) => setProductName(e.target.value)}
+            disabled={isSearchingProduct} // Desabilita enquanto busca
           />
+          {isSearchingProduct && (
+            <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-muted-foreground" />
+          )}
         </div>
       </div>
 
