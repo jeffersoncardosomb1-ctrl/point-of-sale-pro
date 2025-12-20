@@ -1,5 +1,5 @@
-import { useState, useMemo, useEffect } from "react";
-import { Plus, Camera, Trash2, Loader2 } from "lucide-react";
+import { useState, useMemo } from "react";
+import { Plus, Camera, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -7,7 +7,6 @@ import { ScannerModal } from "@/components/sales/ScannerModal";
 import { OrderItem } from "@/types/order";
 import { safeNumber, uuid } from "@/lib/sales-utils";
 import { toast } from "@/hooks/use-toast";
-import { supabase } from "@/integrations/supabase/client"; // Importar o cliente Supabase
 
 interface AddItemFormProps {
   onAddItem: (item: OrderItem) => void;
@@ -20,7 +19,6 @@ export function AddItemForm({ onAddItem }: AddItemFormProps) {
   const [valorUnitario, setValorUnitario] = useState("");
   const [descontoPercentual, setDescontoPercentual] = useState("");
   const [scannerOpen, setScannerOpen] = useState(false);
-  const [isSearchingProduct, setIsSearchingProduct] = useState(false); // Novo estado para indicar busca
 
   const calc = useMemo(() => {
     const qt = safeNumber(quantidade);
@@ -31,56 +29,6 @@ export function AddItemForm({ onAddItem }: AddItemFormProps) {
     const totalLiquido = totalBruto - desconto;
     return { totalBruto, desconto, totalLiquido };
   }, [quantidade, valorUnitario, descontoPercentual]);
-
-  // Efeito para buscar o nome do produto quando o código de barras muda
-  useEffect(() => {
-    const delayDebounceFn = setTimeout(async () => {
-      const trimmedBarcode = barcode.trim();
-      if (trimmedBarcode && trimmedBarcode.length > 5) { // Apenas busca se o código tiver um tamanho razoável
-        setIsSearchingProduct(true);
-        setProductName(""); // Limpa o nome do produto enquanto busca
-        try {
-          const { data, error } = await supabase.functions.invoke('search-product', {
-            body: { barcode: trimmedBarcode },
-          });
-
-          if (error) {
-            console.error("Erro ao buscar produto:", error);
-            toast({
-              title: "Erro na busca",
-              description: "Não foi possível buscar o nome do produto automaticamente.",
-              variant: "destructive",
-            });
-          } else if (data && data.productName) {
-            setProductName(data.productName);
-            toast({
-              title: "Produto encontrado",
-              description: `Nome: ${data.productName}`,
-            });
-          } else {
-            toast({
-              title: "Produto não encontrado",
-              description: "Nenhum produto encontrado para este código. Preencha manualmente.",
-              variant: "info",
-            });
-          }
-        } catch (err) {
-          console.error("Erro inesperado na busca:", err);
-          toast({
-            title: "Erro inesperado",
-            description: "Ocorreu um erro ao tentar buscar o produto.",
-            variant: "destructive",
-          });
-        } finally {
-          setIsSearchingProduct(false);
-        }
-      } else if (!trimmedBarcode) {
-        setProductName(""); // Limpa o nome do produto se o código de barras for limpo
-      }
-    }, 500); // Pequeno atraso para evitar muitas requisições enquanto o usuário digita
-
-    return () => clearTimeout(delayDebounceFn);
-  }, [barcode]);
 
   function resetForm() {
     setBarcode("");
@@ -145,13 +93,12 @@ export function AddItemForm({ onAddItem }: AddItemFormProps) {
             onChange={(e) => setBarcode(e.target.value)}
             inputMode="numeric"
             className="flex-1"
-            disabled={isSearchingProduct}
           />
-          <Button type="button" variant="outline" size="icon" onClick={() => setScannerOpen(true)} disabled={isSearchingProduct}>
+          <Button type="button" variant="outline" size="icon" onClick={() => setScannerOpen(true)}>
             <Camera className="h-4 w-4" />
           </Button>
           {barcode && (
-            <Button type="button" variant="ghost" size="icon" onClick={() => setBarcode("")} disabled={isSearchingProduct}>
+            <Button type="button" variant="ghost" size="icon" onClick={() => setBarcode("")}>
               <Trash2 className="h-4 w-4" />
             </Button>
           )}
@@ -166,11 +113,7 @@ export function AddItemForm({ onAddItem }: AddItemFormProps) {
             placeholder="Ex: Camiseta Básica P"
             value={productName}
             onChange={(e) => setProductName(e.target.value)}
-            disabled={isSearchingProduct} // Desabilita enquanto busca
           />
-          {isSearchingProduct && (
-            <Loader2 className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin text-muted-foreground" />
-          )}
         </div>
       </div>
 
@@ -213,7 +156,7 @@ export function AddItemForm({ onAddItem }: AddItemFormProps) {
         </div>
 
         <div className="flex items-end">
-          <Button type="button" onClick={handleAddItem} className="w-full" disabled={isSearchingProduct}>
+          <Button type="button" onClick={handleAddItem} className="w-full">
             <Plus className="h-4 w-4 mr-2" />
             Adicionar
           </Button>
