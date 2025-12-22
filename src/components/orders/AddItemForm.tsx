@@ -47,21 +47,15 @@ export function AddItemForm({ onAddItem }: AddItemFormProps) {
             .eq("barcode", trimmedBarcode)
             .single();
 
-          if (error) {
-            console.error("Erro do Supabase ao buscar produto:", error);
-            if (error.code === 'PGRST116') { // PGRST116 é "No rows found"
-              console.log("Nenhum produto encontrado para o código de barras:", trimmedBarcode);
-              toast({ title: "Produto não encontrado", description: "Por favor, digite o nome do produto manualmente.", variant: "info" });
-            } else {
-              throw error; // Outros erros devem ser tratados
-            }
-          } else if (data) {
+          if (error && error.code !== 'PGRST116') { // PGRST116 é "No rows found"
+            throw error;
+          }
+
+          if (data) {
             console.log("Produto encontrado no Supabase:", data);
             setProductName(data.product_name);
             toast({ title: "Produto encontrado!", description: data.product_name });
           } else {
-            // Isso não deveria acontecer se error.code === 'PGRST116' for tratado acima
-            console.log("Nenhum produto encontrado (sem erro específico do Supabase).");
             toast({ title: "Produto não encontrado", description: "Por favor, digite o nome do produto manualmente.", variant: "info" });
           }
         } catch (error) {
