@@ -28,7 +28,7 @@ export function ProductCatalogImporter({ onImportComplete }: ProductCatalogImpor
 
   const handleImport = async () => {
     if (!file) {
-      toast({ title: "Erro", description: "Por favor, selecione um arquivo Excel.", variant: "destructive" });
+      toast({ title: "Erro", description: "Por favor, selecione um arquivo Excel ou CSV.", variant: "destructive" });
       return;
     }
 
@@ -45,7 +45,7 @@ export function ProductCatalogImporter({ onImportComplete }: ProductCatalogImpor
         const json = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
 
         if (json.length < 2) { // Assumindo linha de cabeçalho + pelo menos uma linha de dados
-          toast({ title: "Erro", description: "O arquivo Excel está vazio ou não tem dados suficientes.", variant: "destructive" });
+          toast({ title: "Erro", description: "O arquivo está vazio ou não tem dados suficientes.", variant: "destructive" });
           setIsImporting(false);
           return;
         }
@@ -88,7 +88,7 @@ export function ProductCatalogImporter({ onImportComplete }: ProductCatalogImpor
       reader.readAsArrayBuffer(file);
     } catch (error) {
       console.error("Erro ao processar arquivo:", error);
-      toast({ title: "Erro", description: "Erro ao ler o arquivo Excel.", variant: "destructive" });
+      toast({ title: "Erro", description: "Erro ao ler o arquivo.", variant: "destructive" });
     } finally {
       setIsImporting(false);
     }
@@ -104,15 +104,15 @@ export function ProductCatalogImporter({ onImportComplete }: ProductCatalogImpor
       </CardHeader>
       <CardContent className="space-y-4">
         <p className="text-sm text-muted-foreground">
-          Faça upload de um arquivo Excel (.xlsx) com códigos de barras e nomes de produtos.
+          Faça upload de um arquivo Excel (.xlsx) ou CSV com códigos de barras e nomes de produtos.
           A primeira coluna deve ser o código de barras e a segunda o nome do produto.
         </p>
         <div className="space-y-2">
-          <Label htmlFor="product-file">Arquivo Excel</Label>
+          <Label htmlFor="product-file">Arquivo Excel/CSV</Label>
           <Input
             id="product-file"
             type="file"
-            accept=".xlsx, .xls"
+            accept=".xlsx, .xls, .csv"
             onChange={handleFileChange}
             disabled={isImporting}
           />
