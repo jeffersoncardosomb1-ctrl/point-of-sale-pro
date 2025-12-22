@@ -21,6 +21,7 @@ export function AddItemForm({ onAddItem }: AddItemFormProps) {
   const [descontoPercentual, setDescontoPercentual] = useState("");
   const [scannerOpen, setScannerOpen] = useState(false);
   const [isSearchingProduct, setIsSearchingProduct] = useState(false);
+  const [productFoundBySearch, setProductFoundBySearch] = useState(false); // Novo estado para rastrear se o produto foi encontrado pela busca
 
   const calc = useMemo(() => {
     const qt = safeNumber(quantidade);
@@ -39,6 +40,7 @@ export function AddItemForm({ onAddItem }: AddItemFormProps) {
       if (trimmedBarcode) {
         setIsSearchingProduct(true);
         setProductName(""); // Limpa o nome anterior enquanto busca
+        setProductFoundBySearch(false); // Reseta o estado de busca
         console.log("Buscando produto no catálogo para o código de barras:", trimmedBarcode);
         try {
           const { data, error } = await supabase
@@ -54,6 +56,7 @@ export function AddItemForm({ onAddItem }: AddItemFormProps) {
           if (data) {
             console.log("Produto encontrado no Supabase:", data);
             setProductName(data.product_name);
+            setProductFoundBySearch(true); // Marca que o produto foi encontrado
             toast({ title: "Produto encontrado!", description: data.product_name });
           } else {
             toast({ title: "Produto não encontrado", description: "Por favor, digite o nome do produto manualmente.", variant: "info" });
@@ -66,6 +69,7 @@ export function AddItemForm({ onAddItem }: AddItemFormProps) {
         }
       } else {
         setProductName(""); // Limpa o nome se o código de barras estiver vazio
+        setProductFoundBySearch(false);
       }
     };
 
@@ -85,9 +89,10 @@ export function AddItemForm({ onAddItem }: AddItemFormProps) {
     setQuantidade("1");
     setValorUnitario("");
     setDescontoPercentual("");
+    setProductFoundBySearch(false); // Reseta ao limpar o formulário
   }
 
-  function handleAddItem() {
+  async function handleAddItem() {
     const b = barcode.trim();
     const pn = productName.trim();
     const qt = safeNumber(quantidade);
@@ -122,6 +127,24 @@ export function AddItemForm({ onAddItem }: AddItemFormProps) {
       desconto: calc.desconto,
       totalLiquido: calc.totalLiquido,
     };
+
+    // Se o produto não foi encontrado pela busca automática, salve-o no catálogo
+    if (!productFoundBySearch) {
+      try {
+        const { error } = await supabase
+          .from("products")
+          .upsert({ barcode: b, product_name: pn }, { onConflict: 'barcode' });
+
+        if (error) {
+          console.error("Erro ao salvar novo produto no catálogo:", error);
+          toast({ title: "Erro ao salvar produto", description: "Não foi possível salvar o novo produto no catálogo.", variant: "destructive" });
+        } else {
+          toast({ title: "Produto salvo!", description: `"${pn}" adicionado/atualizado no catálogo.`, variant: "success" });
+        }
+      } catch (e) {
+        console.error("Erro inesperado ao salvar produto:", e);
+      }
+    }
 
     onAddItem(item);
     resetForm();
