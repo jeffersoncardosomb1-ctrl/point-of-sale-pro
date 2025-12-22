@@ -2,14 +2,15 @@ import { useState } from "react";
 import { Helmet } from "react-helmet";
 import { useNavigate } from "react-router-dom";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Users, BarChart3, ArrowLeft } from "lucide-react";
+import { Users, BarChart3, ArrowLeft, Package } from "lucide-react"; // Added Package icon
 import { PendingUsersManager } from "@/components/admin/PendingUsersManager";
 import { AdminSalesDashboard } from "@/components/admin/AdminSalesDashboard";
+import { ProductCatalogImporter } from "@/components/admin/ProductCatalogImporter"; // Import new component
 import { useSalesSupabase } from "@/hooks/useSalesSupabase";
 import { UserMenu } from "@/components/layout/UserMenu";
 import { Button } from "@/components/ui/button";
 
-type AdminTab = "users" | "dashboard";
+type AdminTab = "users" | "dashboard" | "products"; // Added 'products' tab
 
 const AdminPage = () => {
   const navigate = useNavigate();
@@ -18,6 +19,11 @@ const AdminPage = () => {
 
   const STORE_NAME = "Fiorenzza Beauty";
   const STORE_LOGO_SRC = "/fiorenzza.png";
+
+  // Função para lidar com a conclusão da importação (opcionalmente, recarregar lista de produtos se exibida)
+  const handleProductImportComplete = () => {
+    // Por enquanto, um toast é suficiente, pois o AddItemForm consultará diretamente.
+  };
 
   return (
     <>
@@ -50,7 +56,7 @@ const AdminPage = () => {
           </header>
 
           <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as AdminTab)} className="w-full">
-            <TabsList className="grid w-full grid-cols-2">
+            <TabsList className="grid w-full grid-cols-3"> {/* Changed to grid-cols-3 */}
               <TabsTrigger value="users" className="flex items-center gap-2">
                 <Users className="h-4 w-4" />
                 Usuários
@@ -59,12 +65,19 @@ const AdminPage = () => {
                 <BarChart3 className="h-4 w-4" />
                 Dashboard
               </TabsTrigger>
+              <TabsTrigger value="products" className="flex items-center gap-2"> {/* New tab */}
+                <Package className="h-4 w-4" />
+                Produtos
+              </TabsTrigger>
             </TabsList>
             <TabsContent value="users" className="mt-4">
               <PendingUsersManager />
             </TabsContent>
             <TabsContent value="dashboard" className="mt-4">
               <AdminSalesDashboard sales={sales} onDeleteCancelledSale={deleteSale} />
+            </TabsContent>
+            <TabsContent value="products" className="mt-4"> {/* New tab content */}
+              <ProductCatalogImporter onImportComplete={handleProductImportComplete} />
             </TabsContent>
           </Tabs>
         </div>

@@ -7,7 +7,7 @@ import { ScannerModal } from "@/components/sales/ScannerModal";
 import { OrderItem } from "@/types/order";
 import { safeNumber, uuid } from "@/lib/sales-utils";
 import { toast } from "@/hooks/use-toast";
-import { buscarProdutoPorEAN } from "@/lib/product-search"; // Importar a nova função
+import { supabase } from "@/integrations/supabase/client"; // Importar supabase
 
 interface AddItemFormProps {
   onAddItem: (item: OrderItem) => void;
@@ -20,7 +20,7 @@ export function AddItemForm({ onAddItem }: AddItemFormProps) {
   const [valorUnitario, setValorUnitario] = useState("");
   const [descontoPercentual, setDescontoPercentual] = useState("");
   const [scannerOpen, setScannerOpen] = useState(false);
-  const [isSearchingProduct, setIsSearchingProduct] = useState(false); // Novo estado para loading
+  const [isSearchingProduct, setIsSearchingProduct] = useState(false);
 
   const calc = useMemo(() => {
     const qt = safeNumber(quantidade);
@@ -32,33 +32,48 @@ export function AddItemForm({ onAddItem }: AddItemFormProps) {
     return { totalBruto, desconto, totalLiquido };
   }, [quantidade, valorUnitario, descontoPercentual]);
 
-  // Efeito para buscar o produto quando o código de barras muda
+  // Efeito para buscar o produto no catálogo do Supabase quando o código de barras muda
   useEffect(() => {
-    const searchProduct = async () => {
+    const searchProductInCatalog = async () => {
       const trimmedBarcode = barcode.trim();
-      if (trimmedBarcode.length > 7) { // EANs geralmente têm 8, 12 ou 13 dígitos
+      if (trimmedBarcode) {
         setIsSearchingProduct(true);
         setProductName(""); // Limpa o nome anterior enquanto busca
-        const result = await buscarProdutoPorEAN(trimmedBarcode);
-        if (result.encontrado && result.nome) {
-          setProductName(result.nome);
-          toast({ title: "Produto encontrado!", description: result.nome });
-        } else {
-          toast({ title: "Produto não encontrado", description: "Por favor, digite o nome do produto manualmente.", variant: "info" });
+        try {
+          const { data, error } = await supabase
+            .from("products")
+            .select("product_name")
+            .eq("barcode", trimmedBarcode)
+            .single();
+
+          if (error && error.code !== 'PGRST116') { // PGRST116 é "No rows found"
+            throw error;
+          }
+
+          if (data) {
+            setProductName(data.product_name);
+            toast({ title: "Produto encontrado!", description: data.product_name });
+          } else {
+            toast({ title: "Produto não encontrado", description: "Por favor, digite o nome do produto manualmente.", variant: "info" });
+          }
+        } catch (error) {
+          console.error("Erro ao buscar produto no catálogo:", error);
+          toast({ title: "Erro na busca", description: "Não foi possível buscar o produto no catálogo.", variant: "destructive" });
+        } finally {
+          setIsSearchingProduct(false);
         }
-        setIsSearchingProduct(false);
-      } else if (trimmedBarcode.length === 0) {
-        setProductName(""); // Limpa o nome se o código de barras for apagado
+      } else {
+        setProductName(""); // Limpa o nome se o código de barras estiver vazio
       }
     };
 
     const handler = setTimeout(() => {
-      searchProduct();
-    }, 500); // Pequeno delay para evitar múltiplas buscas enquanto o usuário digita
+      searchProductInCatalog();
+    }, 300); // Pequeno delay para evitar múltiplas consultas enquanto o usuário digita
 
     return () => {
       clearTimeout(handler);
-      setIsSearchingProduct(false); // Limpa o estado de loading ao desmontar ou antes de uma nova busca
+      setIsSearchingProduct(false);
     };
   }, [barcode]);
 
@@ -145,7 +160,7 @@ export function AddItemForm({ onAddItem }: AddItemFormProps) {
             placeholder="Ex: Camiseta Básica P"
             value={productName}
             onChange={(e) => setProductName(e.target.value)}
-            disabled={isSearchingProduct} // Desabilita enquanto busca
+            disabled={isSearchingProduct}
           />
           {isSearchingProduct && (
             <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-muted-foreground" />
@@ -204,7 +219,7 @@ export function AddItemForm({ onAddItem }: AddItemFormProps) {
         onClose={() => setScannerOpen(false)}
         onDetected={(code) => {
           setBarcode(code);
-          setScannerOpen(false); // Fecha o scanner após detectar
+          setScannerOpen(false);
         }}
       />
     </div>
