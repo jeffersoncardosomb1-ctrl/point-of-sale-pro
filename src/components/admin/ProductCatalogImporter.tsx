@@ -50,14 +50,17 @@ export function ProductCatalogImporter({ onImportComplete }: ProductCatalogImpor
           return;
         }
 
-        // Assumindo que a primeira linha é o cabeçalho, e os dados começam da segunda linha
-        // Assumindo que a primeira coluna é o código de barras e a segunda é o nome do produto
-        const productsToInsert = (json.slice(1) as string[][])
+        // Usar um Map para garantir que apenas a última ocorrência de cada código de barras seja mantida
+        const productsMap = new Map<string, { barcode: string; product_name: string }>();
+        (json.slice(1) as string[][])
           .filter(row => row[0] && row[1]) // Filtrar linhas com código de barras ou nome de produto vazios
-          .map(row => ({
-            barcode: String(row[0]).trim(),
-            product_name: String(row[1]).trim(),
-          }));
+          .forEach(row => {
+            const barcode = String(row[0]).trim();
+            const productName = String(row[1]).trim();
+            productsMap.set(barcode, { barcode, product_name: productName });
+          });
+        
+        const productsToInsert = Array.from(productsMap.values());
 
         if (productsToInsert.length === 0) {
           toast({ title: "Erro", description: "Nenhum produto válido encontrado no arquivo para importação.", variant: "destructive" });
