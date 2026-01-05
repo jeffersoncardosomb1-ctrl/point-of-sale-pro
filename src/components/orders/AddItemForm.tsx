@@ -45,21 +45,24 @@ export function AddItemForm({ onAddItem }: AddItemFormProps) {
         try {
           const { data, error } = await supabase
             .from("products")
-            .select("product_name")
+            .select("product_name, price")
             .eq("barcode", trimmedBarcode)
-            .single();
+            .maybeSingle();
 
-          if (error && error.code !== 'PGRST116') { // PGRST116 é "No rows found"
+          if (error) {
             throw error;
           }
 
           if (data) {
             console.log("Produto encontrado no Supabase:", data);
             setProductName(data.product_name);
-            setProductFoundBySearch(true); // Marca que o produto foi encontrado
+            if (data.price > 0) {
+              setValorUnitario(data.price.toString().replace(".", ","));
+            }
+            setProductFoundBySearch(true);
             toast({ title: "Produto encontrado!", description: data.product_name });
           } else {
-            toast({ title: "Produto não encontrado", description: "Por favor, digite o nome do produto manualmente.", variant: "info" });
+            toast({ title: "Produto não encontrado", description: "Por favor, digite o nome e valor manualmente." });
           }
         } catch (error) {
           console.error("Erro geral ao buscar produto no catálogo:", error);
@@ -89,7 +92,7 @@ export function AddItemForm({ onAddItem }: AddItemFormProps) {
     setQuantidade("1");
     setValorUnitario("");
     setDescontoPercentual("");
-    setProductFoundBySearch(false); // Reseta ao limpar o formulário
+    setProductFoundBySearch(false);
   }
 
   async function handleAddItem() {
@@ -133,13 +136,13 @@ export function AddItemForm({ onAddItem }: AddItemFormProps) {
       try {
         const { error } = await supabase
           .from("products")
-          .upsert({ barcode: b, product_name: pn }, { onConflict: 'barcode' });
+          .upsert({ barcode: b, product_name: pn, price: vu }, { onConflict: 'barcode' });
 
         if (error) {
           console.error("Erro ao salvar novo produto no catálogo:", error);
           toast({ title: "Erro ao salvar produto", description: "Não foi possível salvar o novo produto no catálogo.", variant: "destructive" });
         } else {
-          toast({ title: "Produto salvo!", description: `"${pn}" adicionado/atualizado no catálogo.`, variant: "success" });
+          toast({ title: "Produto salvo!", description: `"${pn}" adicionado/atualizado no catálogo.` });
         }
       } catch (e) {
         console.error("Erro inesperado ao salvar produto:", e);

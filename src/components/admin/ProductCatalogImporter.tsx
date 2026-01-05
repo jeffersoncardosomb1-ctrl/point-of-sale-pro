@@ -51,13 +51,14 @@ export function ProductCatalogImporter({ onImportComplete }: ProductCatalogImpor
         }
 
         // Usar um Map para garantir que apenas a última ocorrência de cada código de barras seja mantida
-        const productsMap = new Map<string, { barcode: string; product_name: string }>();
-        (json.slice(1) as string[][])
+        const productsMap = new Map<string, { barcode: string; product_name: string; price: number }>();
+        (json.slice(1) as (string | number)[][])
           .filter(row => row[0] && row[1]) // Filtrar linhas com código de barras ou nome de produto vazios
           .forEach(row => {
             const barcode = String(row[0]).trim();
             const productName = String(row[1]).trim();
-            productsMap.set(barcode, { barcode, product_name: productName });
+            const price = row[2] ? Number(String(row[2]).replace(",", ".")) || 0 : 0;
+            productsMap.set(barcode, { barcode, product_name: productName, price });
           });
         
         const productsToInsert = Array.from(productsMap.values());
@@ -82,8 +83,8 @@ export function ProductCatalogImporter({ onImportComplete }: ProductCatalogImpor
           failCount = productsToInsert.length;
         } else {
           successCount = productsToInsert.length;
-          toast({ title: "Importação concluída", description: `${successCount} produtos importados/atualizados com sucesso.`, variant: "success" });
-          onImportComplete(); // Notificar o componente pai
+          toast({ title: "Importação concluída", description: `${successCount} produtos importados/atualizados com sucesso.` });
+          onImportComplete();
         }
         
         setImportResult({ success: successCount, failed: failCount });
@@ -107,8 +108,8 @@ export function ProductCatalogImporter({ onImportComplete }: ProductCatalogImpor
       </CardHeader>
       <CardContent className="space-y-4">
         <p className="text-sm text-muted-foreground">
-          Faça upload de um arquivo Excel (.xlsx) ou CSV com códigos de barras e nomes de produtos.
-          A primeira coluna deve ser o código de barras e a segunda o nome do produto.
+          Faça upload de um arquivo Excel (.xlsx) ou CSV com códigos de barras, nomes e preços dos produtos.
+          Colunas: 1ª Código de Barras, 2ª Descrição, 3ª Valor Venda.
         </p>
         <div className="space-y-2">
           <Label htmlFor="product-file">Arquivo Excel/CSV</Label>
