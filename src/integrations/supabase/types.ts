@@ -67,18 +67,21 @@ export type Database = {
           barcode: string
           created_at: string | null
           id: string
+          price: number
           product_name: string
         }
         Insert: {
           barcode: string
           created_at?: string | null
           id?: string
+          price?: number
           product_name: string
         }
         Update: {
           barcode?: string
           created_at?: string | null
           id?: string
+          price?: number
           product_name?: string
         }
         Relationships: []
