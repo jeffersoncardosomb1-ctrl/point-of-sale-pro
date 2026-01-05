@@ -64,22 +64,22 @@ export type Database = {
       }
       products: {
         Row: {
-          id: string
           barcode: string
+          created_at: string | null
+          id: string
           product_name: string
-          created_at: string
         }
         Insert: {
-          id?: string
           barcode: string
+          created_at?: string | null
+          id?: string
           product_name: string
-          created_at?: string
         }
         Update: {
-          id?: string
           barcode?: string
+          created_at?: string | null
+          id?: string
           product_name?: string
-          created_at?: string
         }
         Relationships: []
       }
@@ -327,7 +327,7 @@ export type Enums<
     : never = never,
 > = DefaultSchemaEnumNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
-  }
+}
   ? DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"][EnumName]
   : DefaultSchemaEnumNameOrOptions extends keyof DefaultSchema["Enums"]
     ? DefaultSchema["Enums"][DefaultSchemaEnumNameOrOptions]
