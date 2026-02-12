@@ -56,7 +56,8 @@ export function useSalesSupabase() {
       const { data, error } = await supabase
         .from("sales")
         .select("*")
-        .order("created_at", { ascending: false });
+        .order("created_at", { ascending: false })
+        .limit(10000);
 
       if (error) throw error;
 
