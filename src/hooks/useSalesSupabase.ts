@@ -53,15 +53,30 @@ export function useSalesSupabase() {
   // Fetch all sales from Supabase
   const fetchSales = useCallback(async () => {
     try {
-      const { data, error } = await supabase
-        .from("sales")
-        .select("*")
-        .order("created_at", { ascending: false })
-        .limit(10000);
+      // Supabase PostgREST limits to 1000 rows per request, so we paginate
+      const PAGE_SIZE = 1000;
+      const MAX_ROWS = 10000;
+      let allData: typeof data = [];
+      let page = 0;
+      let data: any[] | null = [];
 
-      if (error) throw error;
+      while (page * PAGE_SIZE < MAX_ROWS) {
+        const from = page * PAGE_SIZE;
+        const to = from + PAGE_SIZE - 1;
+        const { data: pageData, error } = await supabase
+          .from("sales")
+          .select("*")
+          .order("created_at", { ascending: false })
+          .range(from, to);
 
-      const mappedSales = (data || []).map(dbRowToSale);
+        if (error) throw error;
+        if (!pageData || pageData.length === 0) break;
+        allData = [...allData, ...pageData];
+        if (pageData.length < PAGE_SIZE) break; // last page
+        page++;
+      }
+
+      const mappedSales = allData.map(dbRowToSale);
       setSales(mappedSales);
     } catch (error) {
       console.error("Erro ao carregar vendas:", error);
