@@ -19,7 +19,7 @@ export type Database = {
           cancel_motivo: string | null
           canceled_at: string | null
           created_at: string
-          forma_pagamento: Database["public"]["Enums"]["payment_method"]
+          forma_pagamento: string
           id: string
           status: Database["public"]["Enums"]["sale_status"]
           total_bruto: number
@@ -34,7 +34,7 @@ export type Database = {
           cancel_motivo?: string | null
           canceled_at?: string | null
           created_at?: string
-          forma_pagamento?: Database["public"]["Enums"]["payment_method"]
+          forma_pagamento?: string
           id?: string
           status?: Database["public"]["Enums"]["sale_status"]
           total_bruto?: number
@@ -49,7 +49,7 @@ export type Database = {
           cancel_motivo?: string | null
           canceled_at?: string | null
           created_at?: string
-          forma_pagamento?: Database["public"]["Enums"]["payment_method"]
+          forma_pagamento?: string
           id?: string
           status?: Database["public"]["Enums"]["sale_status"]
           total_bruto?: number
@@ -127,7 +127,7 @@ export type Database = {
           created_at: string
           desconto: number
           desconto_percentual: number
-          forma_pagamento: Database["public"]["Enums"]["payment_method"]
+          forma_pagamento: string
           id: string
           order_id: string | null
           product_name: string
@@ -147,7 +147,7 @@ export type Database = {
           created_at?: string
           desconto?: number
           desconto_percentual?: number
-          forma_pagamento?: Database["public"]["Enums"]["payment_method"]
+          forma_pagamento?: string
           id?: string
           order_id?: string | null
           product_name?: string
@@ -167,7 +167,7 @@ export type Database = {
           created_at?: string
           desconto?: number
           desconto_percentual?: number
-          forma_pagamento?: Database["public"]["Enums"]["payment_method"]
+          forma_pagamento?: string
           id?: string
           order_id?: string | null
           product_name?: string

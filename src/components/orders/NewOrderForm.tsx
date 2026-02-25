@@ -4,13 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
 import { AddItemForm } from "./AddItemForm";
 import { OrderItemRow } from "./OrderItemRow";
 import { Order, OrderItem } from "@/types/order";
@@ -22,7 +16,7 @@ import { useAuth } from "@/hooks/useAuth";
 interface NewOrderFormProps {
   onOrderCreated: (order: {
     vendedor: string;
-    formaPagamento: PaymentMethod;
+    formaPagamento: string;
     items: Omit<OrderItem, "id">[];
     descontoManual?: number;
   }) => Promise<Order | null>;
@@ -32,7 +26,7 @@ export function NewOrderForm({ onOrderCreated }: NewOrderFormProps) {
   const { firstName, lastName } = useAuth();
 
   const [items, setItems] = useState<OrderItem[]>([]);
-  const [formaPagamento, setFormaPagamento] = useState<PaymentMethod>("PIX");
+  const [formasPagamento, setFormasPagamento] = useState<PaymentMethod[]>(["PIX"]);
   const [descontoManualInput, setDescontoManualInput] = useState<string>("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -61,9 +55,28 @@ export function NewOrderForm({ onOrderCreated }: NewOrderFormProps) {
     setItems((prev) => prev.filter((_, i) => i !== index));
   }
 
+  const PAYMENT_OPTIONS: { value: PaymentMethod; label: string }[] = [
+    { value: "PIX", label: "PIX" },
+    { value: "CARTAO", label: "Cartão" },
+    { value: "DINHEIRO", label: "Dinheiro" },
+    { value: "BOLETO", label: "Boleto" },
+    { value: "OUTROS", label: "Outros" },
+  ];
+
+  function togglePaymentMethod(method: PaymentMethod) {
+    setFormasPagamento((prev) => {
+      if (prev.includes(method)) {
+        // Don't allow deselecting if it's the only one
+        if (prev.length === 1) return prev;
+        return prev.filter((m) => m !== method);
+      }
+      return [...prev, method];
+    });
+  }
+
   function handleClearAll() {
     setItems([]);
-    setFormaPagamento("PIX");
+    setFormasPagamento(["PIX"]);
     setDescontoManualInput("");
   }
 
@@ -77,7 +90,7 @@ export function NewOrderForm({ onOrderCreated }: NewOrderFormProps) {
     try {
       const result = await onOrderCreated({
         vendedor,
-        formaPagamento,
+        formaPagamento: formasPagamento.join(","),
         items: items.map(({ id, ...rest }) => rest),
         descontoManual: descontoManualValue,
       });
@@ -110,21 +123,21 @@ export function NewOrderForm({ onOrderCreated }: NewOrderFormProps) {
             </div>
 
             <div className="flex-1 space-y-2">
-              <Label htmlFor="formaPagamento">Forma de pagamento</Label>
-              <Select value={formaPagamento} onValueChange={(v) => {
-                setFormaPagamento(v as PaymentMethod);
-              }}>
-                <SelectTrigger id="formaPagamento">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="PIX">PIX</SelectItem>
-                  <SelectItem value="CARTAO">Cartão</SelectItem>
-                  <SelectItem value="DINHEIRO">Dinheiro</SelectItem>
-                  <SelectItem value="BOLETO">Boleto</SelectItem>
-                  <SelectItem value="OUTROS">Outros</SelectItem>
-                </SelectContent>
-              </Select>
+              <Label>Forma de pagamento</Label>
+              <div className="flex flex-wrap gap-3 pt-1">
+                {PAYMENT_OPTIONS.map((opt) => (
+                  <label
+                    key={opt.value}
+                    className="flex items-center gap-2 cursor-pointer select-none"
+                  >
+                    <Checkbox
+                      checked={formasPagamento.includes(opt.value)}
+                      onCheckedChange={() => togglePaymentMethod(opt.value)}
+                    />
+                    <span className="text-sm font-medium">{opt.label}</span>
+                  </label>
+                ))}
+              </div>
             </div>
           </div>
 

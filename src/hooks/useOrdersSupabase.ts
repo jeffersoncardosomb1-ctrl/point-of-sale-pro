@@ -98,9 +98,9 @@ export function useOrdersSupabase() {
     async (
       orderData: {
         vendedor: string;
-        formaPagamento: PaymentMethod;
+        formaPagamento: string;
         items: Omit<OrderItem, "id">[];
-        descontoManual?: number; // Added manual discount
+        descontoManual?: number;
       }
     ): Promise<Order | null> => {
       try {
