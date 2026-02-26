@@ -16,6 +16,12 @@ function dbRowToOrder(row: any, items: OrderItem[]): Order {
     totalLiquido: Number(row.total_liquido),
     valorPago: Number(row.valor_pago),
     troco: Number(row.troco),
+    pgtoPix: Number(row.pgto_pix || 0),
+    pgtoCartao: Number(row.pgto_cartao || 0),
+    pgtoDinheiro: Number(row.pgto_dinheiro || 0),
+    pgtoBoleto: Number(row.pgto_boleto || 0),
+    pgtoOutros: Number(row.pgto_outros || 0),
+    observacoes: row.observacoes || "",
     cancelMotivo: row.cancel_motivo || "",
     canceledAt: row.canceled_at || "",
     items,
@@ -101,6 +107,8 @@ export function useOrdersSupabase() {
         formaPagamento: string;
         items: Omit<OrderItem, "id">[];
         descontoManual?: number;
+        pgtoValues?: Record<string, number>;
+        observacoes?: string;
       }
     ): Promise<Order | null> => {
       try {
@@ -115,6 +123,8 @@ export function useOrdersSupabase() {
         const orderTotalDesconto = totalDescontoProdutos + manualDiscount;
         const orderTotalLiquido = Math.max(0, subtotalLiquido - manualDiscount);
 
+        const pgto = orderData.pgtoValues || {};
+
         // Insert order
         const { data: orderRow, error: orderError } = await supabase
           .from("orders")
@@ -123,10 +133,16 @@ export function useOrdersSupabase() {
             forma_pagamento: orderData.formaPagamento,
             status: "ATIVA",
             total_bruto: totalBruto,
-            total_desconto: orderTotalDesconto, // Use updated total discount
-            total_liquido: orderTotalLiquido,   // Use updated total liquido
-            valor_pago: orderTotalLiquido,      // Valor pago é o total líquido final
+            total_desconto: orderTotalDesconto,
+            total_liquido: orderTotalLiquido,
+            valor_pago: orderTotalLiquido,
             troco: 0,
+            pgto_pix: pgto["PIX"] || 0,
+            pgto_cartao: pgto["CARTAO"] || 0,
+            pgto_dinheiro: pgto["DINHEIRO"] || 0,
+            pgto_boleto: pgto["BOLETO"] || 0,
+            pgto_outros: pgto["OUTROS"] || 0,
+            observacoes: orderData.observacoes || "",
           })
           .select()
           .single();
@@ -152,14 +168,20 @@ export function useOrdersSupabase() {
             product_name: item.productName,
             quantidade: item.quantidade,
             valor_unitario: item.valorUnitario,
-            desconto_percentual: item.descontoPercentual, // Keep original percentage
+            desconto_percentual: item.descontoPercentual,
             total_bruto: item.totalBruto,
-            desconto: itemDesconto,         // Updated item discount
-            total_liquido: itemTotalLiquido, // Updated item total liquido
-            valor_pago: itemTotalLiquido,    // Valor pago para o item é o seu total líquido final
+            desconto: itemDesconto,
+            total_liquido: itemTotalLiquido,
+            valor_pago: itemTotalLiquido,
             troco: 0,
             forma_pagamento: orderData.formaPagamento,
             status: "ATIVA" as const,
+            pgto_pix: pgto["PIX"] || 0,
+            pgto_cartao: pgto["CARTAO"] || 0,
+            pgto_dinheiro: pgto["DINHEIRO"] || 0,
+            pgto_boleto: pgto["BOLETO"] || 0,
+            pgto_outros: pgto["OUTROS"] || 0,
+            observacoes: orderData.observacoes || "",
           };
         });
 

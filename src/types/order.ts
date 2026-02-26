@@ -23,6 +23,12 @@ export interface Order {
   totalLiquido: number;
   valorPago: number;
   troco: number;
+  pgtoPix: number;
+  pgtoCartao: number;
+  pgtoDinheiro: number;
+  pgtoBoleto: number;
+  pgtoOutros: number;
+  observacoes: string;
   cancelMotivo: string;
   canceledAt: string;
   items: OrderItem[];

@@ -156,14 +156,16 @@ export function SalesListView({
                 <TableHead>Status</TableHead>
                 <TableHead>Vendedor</TableHead>
                 <TableHead>Código</TableHead>
-                <TableHead>Produto</TableHead> {/* Nova coluna */}
+                <TableHead>Produto</TableHead>
                 <TableHead className="text-right">Qtd</TableHead>
                 <TableHead className="text-right">Unit.</TableHead>
                 <TableHead className="text-right">Desc.</TableHead>
                 <TableHead className="text-right">Líquido</TableHead>
-                <TableHead>Pgto</TableHead>
-                <TableHead className="text-right">Pago</TableHead>
-                <TableHead className="text-right">Troco</TableHead>
+                <TableHead className="text-right">Pgto PIX</TableHead>
+                <TableHead className="text-right">Pgto Cartão</TableHead>
+                <TableHead className="text-right">Pgto Dinheiro</TableHead>
+                <TableHead className="text-right">Outros</TableHead>
+                <TableHead>Observações</TableHead>
                 <TableHead>Ações</TableHead>
               </TableRow>
             </TableHeader>
@@ -171,7 +173,7 @@ export function SalesListView({
               {filtered.length === 0 ? (
                 <TableRow>
                   <TableCell
-                    colSpan={13}
+                    colSpan={15}
                     className="h-24 text-center text-muted-foreground"
                   >
                     Nenhuma venda encontrada.
@@ -206,7 +208,7 @@ export function SalesListView({
                     </TableCell>
                     <TableCell className="font-semibold">{s.vendedor}</TableCell>
                     <TableCell className="font-mono text-sm">{s.barcode}</TableCell>
-                    <TableCell>{s.productName}</TableCell> {/* Exibir nome do produto */}
+                    <TableCell>{s.productName}</TableCell>
                     <TableCell className="text-right">{s.quantidade}</TableCell>
                     <TableCell className="text-right whitespace-nowrap">
                       {formatBRL(s.valorUnitario)}
@@ -217,12 +219,22 @@ export function SalesListView({
                     <TableCell className="text-right whitespace-nowrap font-bold">
                       {formatBRL(s.totalLiquido)}
                     </TableCell>
-                    <TableCell>{s.formaPagamento}</TableCell>
                     <TableCell className="text-right whitespace-nowrap">
-                      {formatBRL(s.valorPago)}
+                      {s.pgtoPix ? formatBRL(s.pgtoPix) : "-"}
                     </TableCell>
                     <TableCell className="text-right whitespace-nowrap">
-                      {formatBRL(s.troco)}
+                      {s.pgtoCartao ? formatBRL(s.pgtoCartao) : "-"}
+                    </TableCell>
+                    <TableCell className="text-right whitespace-nowrap">
+                      {s.pgtoDinheiro ? formatBRL(s.pgtoDinheiro) : "-"}
+                    </TableCell>
+                    <TableCell className="text-right whitespace-nowrap">
+                      {(s.pgtoBoleto || 0) + (s.pgtoOutros || 0) > 0
+                        ? formatBRL((s.pgtoBoleto || 0) + (s.pgtoOutros || 0))
+                        : "-"}
+                    </TableCell>
+                    <TableCell className="max-w-[150px] truncate text-sm" title={s.observacoes}>
+                      {s.observacoes || "-"}
                     </TableCell>
                     <TableCell>
                       {s.status === "ATIVA" ? (

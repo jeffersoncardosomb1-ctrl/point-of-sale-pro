@@ -269,6 +269,12 @@ export function exportSalesToExcel(filtered: Sale[]): void {
     "Total Bruto": safeNumber(s.totalBruto),
     "Desconto": safeNumber(s.desconto),
     "Total Líquido": safeNumber(s.totalLiquido),
+    "Pgto PIX": safeNumber(s.pgtoPix),
+    "Pgto Cartão": safeNumber(s.pgtoCartao),
+    "Pgto Dinheiro": safeNumber(s.pgtoDinheiro),
+    "Pgto Boleto": safeNumber(s.pgtoBoleto),
+    "Pgto Outros": safeNumber(s.pgtoOutros),
+    "Observações": s.observacoes || "",
     "Forma de Pagamento": s.formaPagamento,
     "Status": s.status,
     "Motivo Cancelamento": s.cancelMotivo || "",
@@ -289,6 +295,12 @@ export function exportSalesToExcel(filtered: Sale[]): void {
     { wch: 14 }, // Total Bruto
     { wch: 12 }, // Desconto
     { wch: 14 }, // Total Líquido
+    { wch: 14 }, // Pgto PIX
+    { wch: 14 }, // Pgto Cartão
+    { wch: 14 }, // Pgto Dinheiro
+    { wch: 14 }, // Pgto Boleto
+    { wch: 14 }, // Pgto Outros
+    { wch: 25 }, // Observações
     { wch: 18 }, // Forma de Pagamento
     { wch: 12 }, // Status
     { wch: 25 }, // Motivo Cancelamento
