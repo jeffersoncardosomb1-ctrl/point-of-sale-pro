@@ -21,6 +21,12 @@ export type Database = {
           created_at: string
           forma_pagamento: string
           id: string
+          observacoes: string
+          pgto_boleto: number
+          pgto_cartao: number
+          pgto_dinheiro: number
+          pgto_outros: number
+          pgto_pix: number
           status: Database["public"]["Enums"]["sale_status"]
           total_bruto: number
           total_desconto: number
@@ -36,6 +42,12 @@ export type Database = {
           created_at?: string
           forma_pagamento?: string
           id?: string
+          observacoes?: string
+          pgto_boleto?: number
+          pgto_cartao?: number
+          pgto_dinheiro?: number
+          pgto_outros?: number
+          pgto_pix?: number
           status?: Database["public"]["Enums"]["sale_status"]
           total_bruto?: number
           total_desconto?: number
@@ -51,6 +63,12 @@ export type Database = {
           created_at?: string
           forma_pagamento?: string
           id?: string
+          observacoes?: string
+          pgto_boleto?: number
+          pgto_cartao?: number
+          pgto_dinheiro?: number
+          pgto_outros?: number
+          pgto_pix?: number
           status?: Database["public"]["Enums"]["sale_status"]
           total_bruto?: number
           total_desconto?: number
@@ -129,7 +147,13 @@ export type Database = {
           desconto_percentual: number
           forma_pagamento: string
           id: string
+          observacoes: string
           order_id: string | null
+          pgto_boleto: number
+          pgto_cartao: number
+          pgto_dinheiro: number
+          pgto_outros: number
+          pgto_pix: number
           product_name: string
           quantidade: number
           status: Database["public"]["Enums"]["sale_status"]
@@ -149,7 +173,13 @@ export type Database = {
           desconto_percentual?: number
           forma_pagamento?: string
           id?: string
+          observacoes?: string
           order_id?: string | null
+          pgto_boleto?: number
+          pgto_cartao?: number
+          pgto_dinheiro?: number
+          pgto_outros?: number
+          pgto_pix?: number
           product_name?: string
           quantidade?: number
           status?: Database["public"]["Enums"]["sale_status"]
@@ -169,7 +199,13 @@ export type Database = {
           desconto_percentual?: number
           forma_pagamento?: string
           id?: string
+          observacoes?: string
           order_id?: string | null
+          pgto_boleto?: number
+          pgto_cartao?: number
+          pgto_dinheiro?: number
+          pgto_outros?: number
+          pgto_pix?: number
           product_name?: string
           quantidade?: number
           status?: Database["public"]["Enums"]["sale_status"]

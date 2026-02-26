@@ -3,6 +3,7 @@ import { ShoppingCart, User, Save, Trash2, Calculator, Banknote } from "lucide-r
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { AddItemForm } from "./AddItemForm";
@@ -19,6 +20,8 @@ interface NewOrderFormProps {
     formaPagamento: string;
     items: Omit<OrderItem, "id">[];
     descontoManual?: number;
+    pgtoValues?: Record<string, number>;
+    observacoes?: string;
   }) => Promise<Order | null>;
 }
 
@@ -27,6 +30,8 @@ export function NewOrderForm({ onOrderCreated }: NewOrderFormProps) {
 
   const [items, setItems] = useState<OrderItem[]>([]);
   const [formasPagamento, setFormasPagamento] = useState<PaymentMethod[]>(["PIX"]);
+  const [pgtoInputs, setPgtoInputs] = useState<Record<string, string>>({});
+  const [observacoes, setObservacoes] = useState("");
   const [descontoManualInput, setDescontoManualInput] = useState<string>("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -38,12 +43,9 @@ export function NewOrderForm({ onOrderCreated }: NewOrderFormProps) {
     const totalBruto = items.reduce((sum, item) => sum + item.totalBruto, 0);
     const totalDescontoProdutos = items.reduce((sum, item) => sum + item.desconto, 0);
     const subtotalLiquido = items.reduce((sum, item) => sum + item.totalLiquido, 0);
-
-    const effectiveDescontoManual = descontoManualValue; 
-
+    const effectiveDescontoManual = descontoManualValue;
     const totalDesconto = totalDescontoProdutos + effectiveDescontoManual;
     const totalLiquido = Math.max(0, subtotalLiquido - effectiveDescontoManual);
-    
     return { totalBruto, totalDescontoProdutos, totalDesconto, totalLiquido, subtotalLiquido };
   }, [items, descontoManualValue]);
 
@@ -66,17 +68,24 @@ export function NewOrderForm({ onOrderCreated }: NewOrderFormProps) {
   function togglePaymentMethod(method: PaymentMethod) {
     setFormasPagamento((prev) => {
       if (prev.includes(method)) {
-        // Don't allow deselecting if it's the only one
         if (prev.length === 1) return prev;
+        // Clear the input value when unchecking
+        setPgtoInputs((p) => { const n = { ...p }; delete n[method]; return n; });
         return prev.filter((m) => m !== method);
       }
       return [...prev, method];
     });
   }
 
+  function handlePgtoInputChange(method: string, value: string) {
+    setPgtoInputs((prev) => ({ ...prev, [method]: value }));
+  }
+
   function handleClearAll() {
     setItems([]);
     setFormasPagamento(["PIX"]);
+    setPgtoInputs({});
+    setObservacoes("");
     setDescontoManualInput("");
   }
 
@@ -86,6 +95,12 @@ export function NewOrderForm({ onOrderCreated }: NewOrderFormProps) {
       return;
     }
 
+    // Build pgtoValues from inputs
+    const pgtoValues: Record<string, number> = {};
+    for (const method of formasPagamento) {
+      pgtoValues[method] = parseFloat((pgtoInputs[method] || "0").replace(",", ".")) || 0;
+    }
+
     setIsSubmitting(true);
     try {
       const result = await onOrderCreated({
@@ -93,6 +108,8 @@ export function NewOrderForm({ onOrderCreated }: NewOrderFormProps) {
         formaPagamento: formasPagamento.join(","),
         items: items.map(({ id, ...rest }) => rest),
         descontoManual: descontoManualValue,
+        pgtoValues,
+        observacoes,
       });
 
       if (result) {
@@ -124,18 +141,27 @@ export function NewOrderForm({ onOrderCreated }: NewOrderFormProps) {
 
             <div className="flex-1 space-y-2">
               <Label>Forma de pagamento</Label>
-              <div className="flex flex-wrap gap-3 pt-1">
+              <div className="space-y-2 pt-1">
                 {PAYMENT_OPTIONS.map((opt) => (
-                  <label
-                    key={opt.value}
-                    className="flex items-center gap-2 cursor-pointer select-none"
-                  >
-                    <Checkbox
-                      checked={formasPagamento.includes(opt.value)}
-                      onCheckedChange={() => togglePaymentMethod(opt.value)}
-                    />
-                    <span className="text-sm font-medium">{opt.label}</span>
-                  </label>
+                  <div key={opt.value} className="flex items-center gap-2">
+                    <label className="flex items-center gap-2 cursor-pointer select-none min-w-[100px]">
+                      <Checkbox
+                        checked={formasPagamento.includes(opt.value)}
+                        onCheckedChange={() => togglePaymentMethod(opt.value)}
+                      />
+                      <span className="text-sm font-medium">{opt.label}</span>
+                    </label>
+                    {formasPagamento.includes(opt.value) && (
+                      <Input
+                        type="text"
+                        inputMode="decimal"
+                        placeholder="0,00"
+                        value={pgtoInputs[opt.value] || ""}
+                        onChange={(e) => handlePgtoInputChange(opt.value, e.target.value)}
+                        className="font-mono w-28 h-8 text-sm"
+                      />
+                    )}
+                  </div>
                 ))}
               </div>
             </div>
@@ -196,7 +222,7 @@ export function NewOrderForm({ onOrderCreated }: NewOrderFormProps) {
             </div>
           </div>
 
-          {/* Campo de desconto manual movido para aqui */}
+          {/* Desconto manual */}
           <div className="space-y-2">
             <Label htmlFor="descontoManual" className="flex items-center gap-2">
               <Banknote className="h-4 w-4" />
@@ -210,6 +236,18 @@ export function NewOrderForm({ onOrderCreated }: NewOrderFormProps) {
               value={descontoManualInput}
               onChange={(e) => setDescontoManualInput(e.target.value)}
               className="font-mono"
+            />
+          </div>
+
+          {/* Observações */}
+          <div className="space-y-2">
+            <Label htmlFor="observacoes">Observações</Label>
+            <Textarea
+              id="observacoes"
+              placeholder="Observações do pedido..."
+              value={observacoes}
+              onChange={(e) => setObservacoes(e.target.value)}
+              className="min-h-[60px]"
             />
           </div>
 

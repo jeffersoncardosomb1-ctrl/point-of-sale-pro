@@ -12,6 +12,12 @@ export interface Sale {
   valorPago: number;
   troco: number;
   formaPagamento: PaymentMethod;
+  pgtoPix: number;
+  pgtoCartao: number;
+  pgtoDinheiro: number;
+  pgtoBoleto: number;
+  pgtoOutros: number;
+  observacoes: string;
   status: SaleStatus;
   cancelMotivo: string;
   canceledAt: string;
