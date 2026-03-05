@@ -64,16 +64,23 @@ export function useOrdersSupabase() {
         return;
       }
 
-      const { data: salesData, error: salesError } = await supabase
-        .from("sales")
-        .select("*")
-        .in("order_id", orderIds);
+      // Batch order IDs to avoid URL length limits (max ~50 per request)
+      const BATCH_SIZE = 50;
+      let allSalesData: any[] = [];
+      for (let i = 0; i < orderIds.length; i += BATCH_SIZE) {
+        const batch = orderIds.slice(i, i + BATCH_SIZE);
+        const { data: salesData, error: salesError } = await supabase
+          .from("sales")
+          .select("*")
+          .in("order_id", batch);
 
-      if (salesError) throw salesError;
+        if (salesError) throw salesError;
+        if (salesData) allSalesData = [...allSalesData, ...salesData];
+      }
 
       // Group sales by order_id
       const salesByOrder: Record<string, OrderItem[]> = {};
-      (salesData || []).forEach((sale) => {
+      allSalesData.forEach((sale) => {
         if (sale.order_id) {
           if (!salesByOrder[sale.order_id]) {
             salesByOrder[sale.order_id] = [];
