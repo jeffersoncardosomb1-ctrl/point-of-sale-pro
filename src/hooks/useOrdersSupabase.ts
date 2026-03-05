@@ -80,7 +80,7 @@ export function useOrdersSupabase() {
 
       // Group sales by order_id
       const salesByOrder: Record<string, OrderItem[]> = {};
-      (salesData || []).forEach((sale) => {
+      allSalesData.forEach((sale) => {
         if (sale.order_id) {
           if (!salesByOrder[sale.order_id]) {
             salesByOrder[sale.order_id] = [];
