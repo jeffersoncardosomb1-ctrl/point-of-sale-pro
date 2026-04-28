@@ -9,8 +9,11 @@ import { useOrdersSupabase } from "@/hooks/useOrdersSupabase";
 import { UserMenu } from "@/components/layout/UserMenu";
 import { useAuth } from "@/hooks/useAuth";
 import { Loader2 } from "lucide-react";
+import { PurchaseEntryView } from "@/components/inventory/PurchaseEntryView";
+import { CostMarginView } from "@/components/inventory/CostMarginView";
+import { KardexView } from "@/components/inventory/KardexView";
 
-type Tab = "nova" | "lista" | "relatorios";
+type Tab = "nova" | "lista" | "relatorios" | "compras" | "custos" | "kardex";
 
 const Index = () => {
   const [tab, setTab] = useState<Tab>("nova");
@@ -58,7 +61,7 @@ const Index = () => {
           <div className="flex justify-end mb-4">
             <UserMenu />
           </div>
-          <SalesHeader activeTab={tab} onTabChange={setTab} storeName={STORE_NAME} storeLogoSrc={STORE_LOGO_SRC} />
+          <SalesHeader activeTab={tab} onTabChange={setTab} storeName={STORE_NAME} storeLogoSrc={STORE_LOGO_SRC} isAdmin={isAdmin} />
 
           {loading ? (
             <div className="flex items-center justify-center py-12">
@@ -83,6 +86,10 @@ const Index = () => {
               {tab === "relatorios" && (
                 <ReportsView sales={sales} onViewList={() => setTab("lista")} />
               )}
+
+              {tab === "compras" && isAdmin && <PurchaseEntryView />}
+              {tab === "custos" && isAdmin && <CostMarginView />}
+              {tab === "kardex" && isAdmin && <KardexView />}
             </>
           )}
         </div>
