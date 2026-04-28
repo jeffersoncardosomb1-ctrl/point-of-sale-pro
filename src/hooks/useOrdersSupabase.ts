@@ -199,6 +199,23 @@ export function useOrdersSupabase() {
 
         if (salesError) throw salesError;
 
+        // Register stock movements (SAIDA) for each sold item — uses cost_avg snapshot
+        // Non-blocking: if RPC fails (e.g. user not admin or product not registered) we keep the sale.
+        try {
+          await Promise.all(
+            (salesData || []).map((s: any) =>
+              supabase.rpc("register_sale_movement", {
+                _sale_id: s.id,
+                _barcode: s.barcode || "",
+                _product_name: s.product_name || "",
+                _quantidade: Number(s.quantidade) || 0,
+              })
+            )
+          );
+        } catch (mvErr) {
+          console.warn("Falha ao registrar movimentação de estoque:", mvErr);
+        }
+
         const newOrder = dbRowToOrder(
           orderRow,
           (salesData || []).map(dbRowToOrderItem)
