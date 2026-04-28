@@ -83,24 +83,30 @@ export type Database = {
       products: {
         Row: {
           barcode: string
+          cost_avg: number
           created_at: string | null
           id: string
           price: number
           product_name: string
+          stock: number
         }
         Insert: {
           barcode: string
+          cost_avg?: number
           created_at?: string | null
           id?: string
           price?: number
           product_name: string
+          stock?: number
         }
         Update: {
           barcode?: string
+          cost_avg?: number
           created_at?: string | null
           id?: string
           price?: number
           product_name?: string
+          stock?: number
         }
         Relationships: []
       }
@@ -137,6 +143,89 @@ export type Database = {
         }
         Relationships: []
       }
+      purchase_entries: {
+        Row: {
+          created_at: string
+          file_name: string
+          id: string
+          observacoes: string
+          total_cost: number
+          total_items: number
+          total_quantity: number
+          user_id: string | null
+          vendedor: string
+        }
+        Insert: {
+          created_at?: string
+          file_name?: string
+          id?: string
+          observacoes?: string
+          total_cost?: number
+          total_items?: number
+          total_quantity?: number
+          user_id?: string | null
+          vendedor?: string
+        }
+        Update: {
+          created_at?: string
+          file_name?: string
+          id?: string
+          observacoes?: string
+          total_cost?: number
+          total_items?: number
+          total_quantity?: number
+          user_id?: string | null
+          vendedor?: string
+        }
+        Relationships: []
+      }
+      purchase_items: {
+        Row: {
+          barcode: string
+          created_at: string
+          custo_medio_apos: number
+          entry_id: string
+          estoque_apos: number
+          id: string
+          product_name: string
+          quantidade: number
+          valor_custo: number
+          valor_venda: number
+        }
+        Insert: {
+          barcode: string
+          created_at?: string
+          custo_medio_apos?: number
+          entry_id: string
+          estoque_apos?: number
+          id?: string
+          product_name?: string
+          quantidade?: number
+          valor_custo?: number
+          valor_venda?: number
+        }
+        Update: {
+          barcode?: string
+          created_at?: string
+          custo_medio_apos?: number
+          entry_id?: string
+          estoque_apos?: number
+          id?: string
+          product_name?: string
+          quantidade?: number
+          valor_custo?: number
+          valor_venda?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "purchase_items_entry_id_fkey"
+            columns: ["entry_id"]
+            isOneToOne: false
+            referencedRelation: "purchase_entries"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       sales: {
         Row: {
           barcode: string
@@ -158,8 +247,10 @@ export type Database = {
           quantidade: number
           status: Database["public"]["Enums"]["sale_status"]
           total_bruto: number
+          total_cost: number
           total_liquido: number
           troco: number
+          unit_cost: number
           valor_pago: number
           valor_unitario: number
           vendedor: string
@@ -184,8 +275,10 @@ export type Database = {
           quantidade?: number
           status?: Database["public"]["Enums"]["sale_status"]
           total_bruto?: number
+          total_cost?: number
           total_liquido?: number
           troco?: number
+          unit_cost?: number
           valor_pago?: number
           valor_unitario?: number
           vendedor: string
@@ -210,8 +303,10 @@ export type Database = {
           quantidade?: number
           status?: Database["public"]["Enums"]["sale_status"]
           total_bruto?: number
+          total_cost?: number
           total_liquido?: number
           troco?: number
+          unit_cost?: number
           valor_pago?: number
           valor_unitario?: number
           vendedor?: string
@@ -225,6 +320,51 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      stock_movements: {
+        Row: {
+          barcode: string
+          created_at: string
+          custo_medio_apos: number
+          custo_unitario: number
+          estoque_apos: number
+          id: string
+          movement_type: string
+          observacoes: string
+          product_name: string
+          quantidade: number
+          reference_id: string | null
+          reference_type: string
+        }
+        Insert: {
+          barcode: string
+          created_at?: string
+          custo_medio_apos?: number
+          custo_unitario?: number
+          estoque_apos?: number
+          id?: string
+          movement_type: string
+          observacoes?: string
+          product_name?: string
+          quantidade: number
+          reference_id?: string | null
+          reference_type?: string
+        }
+        Update: {
+          barcode?: string
+          created_at?: string
+          custo_medio_apos?: number
+          custo_unitario?: number
+          estoque_apos?: number
+          id?: string
+          movement_type?: string
+          observacoes?: string
+          product_name?: string
+          quantidade?: number
+          reference_id?: string | null
+          reference_type?: string
+        }
+        Relationships: []
       }
       user_roles: {
         Row: {
@@ -252,6 +392,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      apply_purchase_entry: {
+        Args: { _file_name: string; _items: Json; _vendedor: string }
+        Returns: string
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
@@ -260,6 +404,15 @@ export type Database = {
         Returns: boolean
       }
       is_admin: { Args: { _user_id: string }; Returns: boolean }
+      register_sale_movement: {
+        Args: {
+          _barcode: string
+          _product_name: string
+          _quantidade: number
+          _sale_id: string
+        }
+        Returns: undefined
+      }
     }
     Enums: {
       app_role: "admin" | "seller"
