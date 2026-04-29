@@ -1,4 +1,4 @@
-import { Component, ReactNode, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -18,42 +18,7 @@ function formatBRL(v: number) {
   return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(v || 0);
 }
 
-class LocalErrorBoundary extends Component<{ children: ReactNode }, { error: Error | null }> {
-  state = { error: null as Error | null };
-  static getDerivedStateFromError(error: Error) {
-    return { error };
-  }
-  componentDidCatch(error: Error, info: unknown) {
-    console.error("[UpdatePriceView] Render error:", error, info);
-  }
-  render() {
-    if (this.state.error) {
-      return (
-        <Card>
-          <CardHeader>
-            <CardTitle>Atualizar valor de venda do produto</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-sm text-destructive">
-              Ocorreu um erro ao carregar a tela: {this.state.error.message}
-            </p>
-          </CardContent>
-        </Card>
-      );
-    }
-    return this.props.children;
-  }
-}
-
 export function UpdatePriceView() {
-  return (
-    <LocalErrorBoundary>
-      <UpdatePriceViewInner />
-    </LocalErrorBoundary>
-  );
-}
-
-function UpdatePriceViewInner() {
   const [barcode, setBarcode] = useState("");
   const [product, setProduct] = useState<ProductInfo | null>(null);
   const [newPrice, setNewPrice] = useState("");
@@ -66,20 +31,18 @@ function UpdatePriceViewInner() {
     barcodeRef.current?.focus();
   }, []);
 
-  async function handleSearch(code?: string) {
-    const q = (code ?? barcode).trim();
+  async function handleSearch() {
+    const q = barcode.trim();
     if (!q) return;
     setSearching(true);
     setProduct(null);
     setNewPrice("");
     try {
-      console.log("[UpdatePriceView] Buscando produto:", q);
       const { data, error } = await supabase
         .from("products")
         .select("id, barcode, product_name, price")
         .eq("barcode", q)
         .maybeSingle();
-      console.log("[UpdatePriceView] Resposta:", { data, error });
       if (error) throw error;
       if (!data) {
         toast.error("Produto não encontrado para o código informado.");
@@ -154,14 +117,14 @@ function UpdatePriceViewInner() {
               placeholder="Bipe ou digite o código de barras"
               autoComplete="off"
             />
-            <Button onClick={() => handleSearch()} disabled={searching || !barcode.trim()} className="gap-2">
+            <Button onClick={handleSearch} disabled={searching || !barcode.trim()} className="gap-2">
               {searching ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
               Buscar
             </Button>
           </div>
         </div>
 
-        {product && (
+        {product ? (
           <div className="rounded-md border p-4 space-y-4 bg-muted/30">
             <div className="grid gap-2 sm:grid-cols-2">
               <div>
@@ -174,7 +137,7 @@ function UpdatePriceViewInner() {
               </div>
               <div>
                 <p className="text-xs text-muted-foreground">Valor atual</p>
-                <p className="font-semibold">{formatBRL(Number(product.price) || 0)}</p>
+                <p className="font-semibold">{formatBRL(product.price)}</p>
               </div>
             </div>
 
@@ -201,7 +164,7 @@ function UpdatePriceViewInner() {
               Atualizar cadastro produto
             </Button>
           </div>
-        )}
+        ) : null}
       </CardContent>
     </Card>
   );
