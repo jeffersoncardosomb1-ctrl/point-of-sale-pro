@@ -91,7 +91,7 @@ const Index = () => {
               {tab === "compras" && isAdmin && <PurchaseEntryView />}
               {tab === "custos" && isAdmin && <CostMarginView />}
               {tab === "kardex" && isAdmin && <KardexView />}
-              {tab === "preco" && isAdmin && <UpdatePriceView />}
+              {tab === "preco" && <UpdatePriceView />}
             </>
           )}
         </div>
