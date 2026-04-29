@@ -12,8 +12,9 @@ import { Loader2 } from "lucide-react";
 import { PurchaseEntryView } from "@/components/inventory/PurchaseEntryView";
 import { CostMarginView } from "@/components/inventory/CostMarginView";
 import { KardexView } from "@/components/inventory/KardexView";
+import { UpdatePriceView } from "@/components/inventory/UpdatePriceView";
 
-type Tab = "nova" | "lista" | "relatorios" | "compras" | "custos" | "kardex";
+type Tab = "nova" | "lista" | "relatorios" | "compras" | "custos" | "kardex" | "preco";
 
 const Index = () => {
   const [tab, setTab] = useState<Tab>("nova");
@@ -90,6 +91,7 @@ const Index = () => {
               {tab === "compras" && isAdmin && <PurchaseEntryView />}
               {tab === "custos" && isAdmin && <CostMarginView />}
               {tab === "kardex" && isAdmin && <KardexView />}
+              {tab === "preco" && isAdmin && <UpdatePriceView />}
             </>
           )}
         </div>
