@@ -3,9 +3,11 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
-import { Loader2, TrendingUp, TrendingDown, DollarSign, Percent } from "lucide-react";
+import { Loader2, TrendingUp, TrendingDown, DollarSign, Percent, AlertTriangle, Save } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { formatBRL } from "@/lib/sales-utils";
+import { useAuth } from "@/hooks/useAuth";
+import { toast } from "@/hooks/use-toast";
 
 interface SaleRow {
   id: string;
@@ -29,11 +31,15 @@ function daysAgoISO(days: number) {
 }
 
 export function CostMarginView() {
+  const { isAdmin } = useAuth();
   const [from, setFrom] = useState(daysAgoISO(30));
   const [to, setTo] = useState(todayISO());
   const [productFilter, setProductFilter] = useState("");
   const [loading, setLoading] = useState(true);
   const [rows, setRows] = useState<SaleRow[]>([]);
+  const [costInputs, setCostInputs] = useState<Record<string, string>>({});
+  const [savingId, setSavingId] = useState<string | null>(null);
+  const [propagate, setPropagate] = useState(true);
 
   async function load() {
     setLoading(true);
@@ -65,6 +71,70 @@ export function CostMarginView() {
     () => rows.filter((r) => Number(r.unit_cost) > 0 || Number(r.total_cost) > 0),
     [rows]
   );
+
+  // Sales without cost — eligible for manual admin entry
+  const semCusto = useMemo(
+    () => rows.filter((r) => !(Number(r.unit_cost) > 0) && !(Number(r.total_cost) > 0)),
+    [rows]
+  );
+
+  const semCustoFiltered = useMemo(() => {
+    const q = productFilter.trim().toLowerCase();
+    if (!q) return semCusto;
+    return semCusto.filter(
+      (r) => r.product_name.toLowerCase().includes(q) || r.barcode.toLowerCase().includes(q)
+    );
+  }, [semCusto, productFilter]);
+
+  function parseCost(v: string): number {
+    if (!v) return 0;
+    const n = Number(String(v).replace(/\./g, "").replace(",", "."));
+    return isNaN(n) ? 0 : n;
+  }
+
+  async function handleSaveCost(row: SaleRow) {
+    const raw = costInputs[row.id];
+    const unit = parseCost(raw || "");
+    if (unit <= 0) {
+      toast({ title: "Custo inválido", description: "Informe um valor maior que zero.", variant: "destructive" });
+      return;
+    }
+    setSavingId(row.id);
+    try {
+      const totalCost = unit * Number(row.quantidade || 0);
+      const { error: saleErr } = await supabase
+        .from("sales")
+        .update({ unit_cost: unit, total_cost: totalCost })
+        .eq("id", row.id);
+      if (saleErr) throw saleErr;
+
+      if (propagate && row.barcode) {
+        const { data: prod } = await supabase
+          .from("products")
+          .select("id, cost_avg")
+          .eq("barcode", row.barcode)
+          .maybeSingle();
+        if (prod && (!prod.cost_avg || Number(prod.cost_avg) <= 0)) {
+          await supabase.from("products").update({ cost_avg: unit }).eq("id", prod.id);
+        }
+      }
+
+      setRows((prev) =>
+        prev.map((r) => (r.id === row.id ? { ...r, unit_cost: unit, total_cost: totalCost } : r))
+      );
+      setCostInputs((prev) => {
+        const next = { ...prev };
+        delete next[row.id];
+        return next;
+      });
+      toast({ title: "Custo registrado", description: `${row.product_name || row.barcode}` });
+    } catch (err: any) {
+      console.error(err);
+      toast({ title: "Erro ao salvar", description: err?.message || "Falha ao atualizar custo.", variant: "destructive" });
+    } finally {
+      setSavingId(null);
+    }
+  }
 
   const filtered = useMemo(() => {
     const q = productFilter.trim().toLowerCase();
@@ -147,6 +217,90 @@ export function CostMarginView() {
           </p>
         </CardContent>
       </Card>
+
+      {isAdmin && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-base">
+              <AlertTriangle className="h-4 w-4 text-warning" />
+              Vendas sem custo cadastrado ({semCustoFiltered.length})
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <div className="flex items-center justify-between flex-wrap gap-2">
+              <p className="text-xs text-muted-foreground">
+                Informe manualmente o custo unitário para incluir essas vendas nos cálculos de margem.
+              </p>
+              <label className="flex items-center gap-2 text-xs">
+                <input
+                  type="checkbox"
+                  checked={propagate}
+                  onChange={(e) => setPropagate(e.target.checked)}
+                />
+                Atualizar custo médio do produto (se ainda não tiver)
+              </label>
+            </div>
+            <div className="overflow-auto max-h-96 rounded-lg border">
+              <table className="w-full text-sm">
+                <thead className="bg-muted sticky top-0">
+                  <tr className="text-left">
+                    <th className="px-3 py-2">Data</th>
+                    <th className="px-3 py-2">Código</th>
+                    <th className="px-3 py-2">Produto</th>
+                    <th className="px-3 py-2 text-right">Qtd</th>
+                    <th className="px-3 py-2 text-right">Receita</th>
+                    <th className="px-3 py-2 text-right">Custo unit.</th>
+                    <th className="px-3 py-2 text-right">Ação</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {semCustoFiltered.map((r) => (
+                    <tr key={r.id} className="border-t">
+                      <td className="px-3 py-2 text-xs">{new Date(r.created_at).toLocaleDateString("pt-BR")}</td>
+                      <td className="px-3 py-2 font-mono text-xs">{r.barcode}</td>
+                      <td className="px-3 py-2">{r.product_name}</td>
+                      <td className="px-3 py-2 text-right">{r.quantidade}</td>
+                      <td className="px-3 py-2 text-right">{formatBRL(Number(r.total_liquido))}</td>
+                      <td className="px-3 py-2 text-right w-32">
+                        <Input
+                          inputMode="decimal"
+                          placeholder="0,00"
+                          value={costInputs[r.id] ?? ""}
+                          onChange={(e) =>
+                            setCostInputs((prev) => ({ ...prev, [r.id]: e.target.value }))
+                          }
+                          className="h-8 text-right"
+                        />
+                      </td>
+                      <td className="px-3 py-2 text-right">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => handleSaveCost(r)}
+                          disabled={savingId === r.id}
+                        >
+                          {savingId === r.id ? (
+                            <Loader2 className="h-3 w-3 animate-spin" />
+                          ) : (
+                            <><Save className="h-3 w-3 mr-1" />Salvar</>
+                          )}
+                        </Button>
+                      </td>
+                    </tr>
+                  ))}
+                  {semCustoFiltered.length === 0 && (
+                    <tr>
+                      <td colSpan={7} className="px-3 py-8 text-center text-muted-foreground">
+                        Nenhuma venda sem custo no período.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       <Card>
         <CardHeader>
