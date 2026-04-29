@@ -51,6 +51,14 @@ export function SalesHeader({ activeTab, onTabChange, storeName, storeLogoSrc, i
           <BarChart3 className="h-4 w-4" />
           Relatórios
         </Button>
+        <Button
+          variant={activeTab === "preco" ? "default" : "outline"}
+          onClick={() => onTabChange("preco")}
+          className="gap-2"
+        >
+          <Tag className="h-4 w-4" />
+          Atualizar Preço
+        </Button>
         {isAdmin && (
           <>
             <Button
@@ -76,14 +84,6 @@ export function SalesHeader({ activeTab, onTabChange, storeName, storeLogoSrc, i
             >
               <History className="h-4 w-4" />
               Kardex
-            </Button>
-            <Button
-              variant={activeTab === "preco" ? "default" : "outline"}
-              onClick={() => onTabChange("preco")}
-              className="gap-2"
-            >
-              <Tag className="h-4 w-4" />
-              Atualizar Preço
             </Button>
           </>
         )}
