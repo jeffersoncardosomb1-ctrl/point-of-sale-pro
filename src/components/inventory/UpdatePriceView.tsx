@@ -38,21 +38,30 @@ export function UpdatePriceView() {
     setProduct(null);
     setNewPrice("");
     try {
+      console.log("[UpdatePriceView] Buscando produto:", q);
       const { data, error } = await supabase
         .from("products")
         .select("id, barcode, product_name, price")
         .eq("barcode", q)
         .maybeSingle();
+      console.log("[UpdatePriceView] Resposta:", { data, error });
       if (error) throw error;
       if (!data) {
         toast.error("Produto não encontrado para o código informado.");
         return;
       }
-      setProduct(data as ProductInfo);
-      setNewPrice(String(Number(data.price ?? 0).toFixed(2)).replace(".", ","));
+      const safe: ProductInfo = {
+        id: String(data.id ?? ""),
+        barcode: String(data.barcode ?? ""),
+        product_name: String(data.product_name ?? ""),
+        price: Number(data.price ?? 0) || 0,
+      };
+      setProduct(safe);
+      setNewPrice(safe.price.toFixed(2).replace(".", ","));
       setTimeout(() => priceRef.current?.focus(), 50);
     } catch (e: any) {
-      toast.error(e.message || "Erro ao buscar produto.");
+      console.error("[UpdatePriceView] Erro na busca:", e);
+      toast.error(e?.message || "Erro ao buscar produto.");
     } finally {
       setSearching(false);
     }
