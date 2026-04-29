@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { Component, ReactNode, useEffect, useRef, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -18,7 +18,42 @@ function formatBRL(v: number) {
   return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(v || 0);
 }
 
+class LocalErrorBoundary extends Component<{ children: ReactNode }, { error: Error | null }> {
+  state = { error: null as Error | null };
+  static getDerivedStateFromError(error: Error) {
+    return { error };
+  }
+  componentDidCatch(error: Error, info: unknown) {
+    console.error("[UpdatePriceView] Render error:", error, info);
+  }
+  render() {
+    if (this.state.error) {
+      return (
+        <Card>
+          <CardHeader>
+            <CardTitle>Atualizar valor de venda do produto</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm text-destructive">
+              Ocorreu um erro ao carregar a tela: {this.state.error.message}
+            </p>
+          </CardContent>
+        </Card>
+      );
+    }
+    return this.props.children;
+  }
+}
+
 export function UpdatePriceView() {
+  return (
+    <LocalErrorBoundary>
+      <UpdatePriceViewInner />
+    </LocalErrorBoundary>
+  );
+}
+
+function UpdatePriceViewInner() {
   const [barcode, setBarcode] = useState("");
   const [product, setProduct] = useState<ProductInfo | null>(null);
   const [newPrice, setNewPrice] = useState("");
