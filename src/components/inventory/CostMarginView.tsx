@@ -188,58 +188,110 @@ export function CostMarginView() {
     try {
       const doc = new jsPDF();
       const pageWidth = doc.internal.pageSize.getWidth();
+      const pageHeight = doc.internal.pageSize.getHeight();
       const GOLD: [number, number, number] = [212, 168, 68];
       const PEACH: [number, number, number] = [245, 196, 161];
       const DARK: [number, number, number] = [30, 35, 40];
       const LIGHT: [number, number, number] = [248, 249, 250];
       const WHITE: [number, number, number] = [255, 255, 255];
+      const SUCCESS: [number, number, number] = [34, 139, 87];
+      const DANGER: [number, number, number] = [200, 60, 60];
+      const MUTED: [number, number, number] = [110, 115, 125];
+      const margin = 15;
 
-      let y = 15;
-      doc.setFontSize(18);
-      doc.setTextColor(...GOLD);
+      // ===== Cabeçalho com faixa dourada =====
+      doc.setFillColor(...GOLD);
+      doc.rect(0, 0, pageWidth, 28, "F");
+      doc.setFillColor(...PEACH);
+      doc.rect(0, 28, pageWidth, 3, "F");
+
+      doc.setFontSize(20);
+      doc.setTextColor(...WHITE);
       doc.setFont("helvetica", "bold");
-      doc.text("Relatório de Custos e Margens", pageWidth / 2, y, { align: "center" });
-      y += 8;
-
+      doc.text("FIORENZZA", margin, 13);
       doc.setFontSize(10);
-      doc.setTextColor(...DARK);
       doc.setFont("helvetica", "normal");
-      doc.text(`Período: ${formatDateBR(from)} a ${formatDateBR(to)}`, pageWidth / 2, y, { align: "center" });
-      y += 6;
+      doc.text("Relatório Gerencial de Custos e Margens", margin, 21);
+
+      doc.setFontSize(8);
+      doc.text(`Emitido em ${new Date().toLocaleString("pt-BR")}`, pageWidth - margin, 13, { align: "right" });
+      doc.text(`Período: ${formatDateBR(from)} a ${formatDateBR(to)}`, pageWidth - margin, 21, { align: "right" });
+
+      let y = 40;
       if (productFilter.trim()) {
-        doc.text(`Filtro: ${productFilter.trim()}`, pageWidth / 2, y, { align: "center" });
+        doc.setFontSize(9);
+        doc.setTextColor(...MUTED);
+        doc.setFont("helvetica", "italic");
+        doc.text(`Filtro aplicado: "${productFilter.trim()}"`, margin, y);
         y += 6;
       }
-      doc.text(`Emitido em: ${new Date().toLocaleString("pt-BR")}`, pageWidth / 2, y, { align: "center" });
-      y += 10;
 
-      // Resumo
-      const boxH = 24;
-      doc.setFillColor(...PEACH);
-      doc.roundedRect(15, y, pageWidth - 30, boxH, 3, 3, "F");
-      doc.setFontSize(9);
-      doc.setTextColor(...DARK);
-      doc.setFont("helvetica", "bold");
-      doc.text("RESUMO", 20, y + 7);
-      doc.setFont("helvetica", "normal");
-      const resumo = [
-        `Receita: ${formatBRL(totals.receita)}`,
-        `CMV: ${formatBRL(totals.cmv)}`,
-        `Lucro: ${formatBRL(totals.lucro)}`,
-        `Margem: ${totals.margem.toFixed(1)}%`,
-      ].join("   |   ");
-      doc.text(resumo, 20, y + 16);
+      // ===== KPIs principais (cards) =====
+      const kpis = [
+        { label: "RECEITA TOTAL", value: formatBRL(totals.receita), color: DARK },
+        { label: "CMV", value: formatBRL(totals.cmv), color: DARK },
+        { label: "LUCRO BRUTO", value: formatBRL(totals.lucro), color: totals.lucro >= 0 ? SUCCESS : DANGER },
+        { label: "MARGEM", value: `${totals.margem.toFixed(1)}%`, color: totals.margem >= 0 ? SUCCESS : DANGER },
+      ];
+      const gap = 4;
+      const cardW = (pageWidth - margin * 2 - gap * 3) / 4;
+      const cardH = 26;
+      kpis.forEach((k, i) => {
+        const x = margin + i * (cardW + gap);
+        doc.setFillColor(...LIGHT);
+        doc.roundedRect(x, y, cardW, cardH, 2, 2, "F");
+        doc.setFillColor(...GOLD);
+        doc.rect(x, y, cardW, 1.2, "F");
+        doc.setFontSize(7);
+        doc.setTextColor(...MUTED);
+        doc.setFont("helvetica", "bold");
+        doc.text(k.label, x + 4, y + 8);
+        doc.setFontSize(13);
+        doc.setTextColor(...k.color);
+        doc.text(k.value, x + 4, y + 19);
+      });
+      y += cardH + 4;
+
+      // ===== KPIs secundários =====
+      const totalQtd = byProduct.reduce((s, p) => s + p.qty, 0);
+      const totalProdutos = byProduct.length;
+      const ticketMedio = totalQtd > 0 ? totals.receita / totalQtd : 0;
+      const sub = [
+        { label: "PRODUTOS DIFERENTES", value: String(totalProdutos) },
+        { label: "UNIDADES VENDIDAS", value: String(totalQtd) },
+        { label: "TICKET MÉDIO / UN.", value: formatBRL(ticketMedio) },
+        { label: "MARKUP MÉDIO", value: totals.cmv > 0 ? `${((totals.receita / totals.cmv - 1) * 100).toFixed(1)}%` : "—" },
+      ];
+      const subH = 16;
+      sub.forEach((k, i) => {
+        const x = margin + i * (cardW + gap);
+        doc.setDrawColor(220, 220, 220);
+        doc.setLineWidth(0.3);
+        doc.roundedRect(x, y, cardW, subH, 2, 2, "S");
+        doc.setFontSize(6.5);
+        doc.setTextColor(...MUTED);
+        doc.setFont("helvetica", "bold");
+        doc.text(k.label, x + 4, y + 6);
+        doc.setFontSize(10);
+        doc.setTextColor(...DARK);
+        doc.text(k.value, x + 4, y + 13);
+      });
+      y += subH + 8;
+
       doc.setFontSize(7);
-      doc.setTextColor(120, 120, 120);
-      doc.text("* Apenas vendas com custo registrado.", 20, y + 21);
-      y += boxH + 8;
+      doc.setFont("helvetica", "italic");
+      doc.setTextColor(...MUTED);
+      doc.text("* Apenas vendas com custo registrado entram nos cálculos.", margin, y);
+      y += 6;
 
-      // Tabela por produto
-      doc.setFontSize(11);
+      // ===== Tabela por produto com totalizadores =====
+      doc.setFontSize(12);
       doc.setTextColor(...DARK);
       doc.setFont("helvetica", "bold");
-      doc.text("Por produto", 15, y);
-      y += 4;
+      doc.text("Desempenho por Produto", margin, y);
+      doc.setDrawColor(...GOLD);
+      doc.setLineWidth(0.5);
+      doc.line(margin, y + 2, pageWidth - margin, y + 2);
 
       autoTable(doc, {
         head: [["Código", "Produto", "Qtd", "Receita", "CMV", "Lucro", "Margem"]],
@@ -252,63 +304,82 @@ export function CostMarginView() {
           formatBRL(p.lucro),
           `${p.margem.toFixed(1)}%`,
         ]),
-        startY: y + 2,
+        foot: [[
+          "",
+          "TOTAL",
+          String(totalQtd),
+          formatBRL(totals.receita),
+          formatBRL(totals.cmv),
+          formatBRL(totals.lucro),
+          `${totals.margem.toFixed(1)}%`,
+        ]],
+        startY: y + 5,
         headStyles: { fillColor: GOLD, textColor: WHITE, fontStyle: "bold", fontSize: 9 },
+        footStyles: { fillColor: PEACH, textColor: DARK, fontStyle: "bold", fontSize: 9 },
         alternateRowStyles: { fillColor: LIGHT },
         styles: { fontSize: 8, cellPadding: 2.5 },
         columnStyles: {
-          2: { halign: "right" },
-          3: { halign: "right" },
-          4: { halign: "right" },
-          5: { halign: "right", fontStyle: "bold" },
-          6: { halign: "right" },
+          0: { cellWidth: 24 },
+          2: { halign: "right", cellWidth: 14 },
+          3: { halign: "right", cellWidth: 26 },
+          4: { halign: "right", cellWidth: 26 },
+          5: { halign: "right", cellWidth: 26, fontStyle: "bold" },
+          6: { halign: "right", cellWidth: 18 },
         },
       });
 
       let afterY = (doc as any).lastAutoTable?.finalY ?? y + 10;
 
       // Top lucrativos
-      if (afterY > 230) { doc.addPage(); afterY = 15; }
+      if (afterY > pageHeight - 80) { doc.addPage(); afterY = 20; }
       afterY += 10;
-      doc.setFontSize(11);
+      doc.setFontSize(12);
       doc.setFont("helvetica", "bold");
       doc.setTextColor(...DARK);
-      doc.text("Top 10 mais lucrativos", 15, afterY);
+      doc.text("Top 10 Mais Lucrativos", margin, afterY);
+      doc.setDrawColor(...GOLD);
+      doc.line(margin, afterY + 2, pageWidth - margin, afterY + 2);
       autoTable(doc, {
         head: [["#", "Produto", "Lucro"]],
         body: topLucrativos.map((p, i) => [String(i + 1), p.name || p.barcode, formatBRL(p.lucro)]),
-        startY: afterY + 2,
+        startY: afterY + 5,
+        headStyles: { fillColor: GOLD, textColor: WHITE, fontStyle: "bold", fontSize: 9 },
+        alternateRowStyles: { fillColor: LIGHT },
+        styles: { fontSize: 8, cellPadding: 2.5 },
+        columnStyles: { 0: { cellWidth: 10 }, 2: { halign: "right", fontStyle: "bold", textColor: SUCCESS } },
+      });
+
+      let afterY2 = (doc as any).lastAutoTable?.finalY ?? afterY + 10;
+      if (afterY2 > pageHeight - 80) { doc.addPage(); afterY2 = 20; }
+      afterY2 += 10;
+      doc.setFontSize(12);
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(...DARK);
+      doc.text("10 com Menor Margem", margin, afterY2);
+      doc.setDrawColor(...GOLD);
+      doc.line(margin, afterY2 + 2, pageWidth - margin, afterY2 + 2);
+      autoTable(doc, {
+        head: [["#", "Produto", "Margem"]],
+        body: menorMargem.map((p, i) => [String(i + 1), p.name || p.barcode, `${p.margem.toFixed(1)}%`]),
+        startY: afterY2 + 5,
         headStyles: { fillColor: GOLD, textColor: WHITE, fontStyle: "bold", fontSize: 9 },
         alternateRowStyles: { fillColor: LIGHT },
         styles: { fontSize: 8, cellPadding: 2.5 },
         columnStyles: { 0: { cellWidth: 10 }, 2: { halign: "right", fontStyle: "bold" } },
       });
 
-      let afterY2 = (doc as any).lastAutoTable?.finalY ?? afterY + 10;
-      if (afterY2 > 230) { doc.addPage(); afterY2 = 15; }
-      afterY2 += 10;
-      doc.setFontSize(11);
-      doc.setFont("helvetica", "bold");
-      doc.setTextColor(...DARK);
-      doc.text("10 com menor margem", 15, afterY2);
-      autoTable(doc, {
-        head: [["#", "Produto", "Margem"]],
-        body: menorMargem.map((p, i) => [String(i + 1), p.name || p.barcode, `${p.margem.toFixed(1)}%`]),
-        startY: afterY2 + 2,
-        headStyles: { fillColor: GOLD, textColor: WHITE, fontStyle: "bold", fontSize: 9 },
-        alternateRowStyles: { fillColor: LIGHT },
-        styles: { fontSize: 8, cellPadding: 2.5 },
-        columnStyles: { 0: { cellWidth: 10 }, 2: { halign: "right" } },
-      });
-
-      // Rodapé em todas páginas
+      // Rodapé em todas as páginas
       const pageCount = doc.getNumberOfPages();
-      const pageHeight = doc.internal.pageSize.getHeight();
       for (let i = 1; i <= pageCount; i++) {
         doc.setPage(i);
-        doc.setFontSize(8);
-        doc.setTextColor(150, 150, 150);
-        doc.text(`Página ${i}/${pageCount} - Sistema Fiorenzza`, pageWidth / 2, pageHeight - 8, { align: "center" });
+        doc.setDrawColor(...GOLD);
+        doc.setLineWidth(0.3);
+        doc.line(margin, pageHeight - 12, pageWidth - margin, pageHeight - 12);
+        doc.setFontSize(7.5);
+        doc.setTextColor(...MUTED);
+        doc.setFont("helvetica", "normal");
+        doc.text("Relatório confidencial - Sistema Fiorenzza", margin, pageHeight - 7);
+        doc.text(`Página ${i} de ${pageCount}`, pageWidth - margin, pageHeight - 7, { align: "right" });
       }
 
       doc.save(`custos-margens-${from}-a-${to}.pdf`);
