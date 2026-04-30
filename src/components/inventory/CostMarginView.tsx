@@ -3,11 +3,13 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
-import { Loader2, TrendingUp, TrendingDown, DollarSign, Percent, AlertTriangle, Save } from "lucide-react";
+import { Loader2, TrendingUp, TrendingDown, DollarSign, Percent, AlertTriangle, Save, FileDown } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { formatBRL } from "@/lib/sales-utils";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "@/hooks/use-toast";
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
 
 interface SaleRow {
   id: string;
@@ -174,6 +176,149 @@ export function CostMarginView() {
   const topLucrativos = byProduct.slice(0, 10);
   const menorMargem = [...byProduct].sort((a, b) => a.margem - b.margem).slice(0, 10);
 
+  function formatDateBR(iso: string) {
+    try {
+      return new Date(iso + "T00:00:00").toLocaleDateString("pt-BR");
+    } catch {
+      return iso;
+    }
+  }
+
+  function handleExportPDF() {
+    try {
+      const doc = new jsPDF();
+      const pageWidth = doc.internal.pageSize.getWidth();
+      const GOLD: [number, number, number] = [212, 168, 68];
+      const PEACH: [number, number, number] = [245, 196, 161];
+      const DARK: [number, number, number] = [30, 35, 40];
+      const LIGHT: [number, number, number] = [248, 249, 250];
+      const WHITE: [number, number, number] = [255, 255, 255];
+
+      let y = 15;
+      doc.setFontSize(18);
+      doc.setTextColor(...GOLD);
+      doc.setFont("helvetica", "bold");
+      doc.text("Relatório de Custos e Margens", pageWidth / 2, y, { align: "center" });
+      y += 8;
+
+      doc.setFontSize(10);
+      doc.setTextColor(...DARK);
+      doc.setFont("helvetica", "normal");
+      doc.text(`Período: ${formatDateBR(from)} a ${formatDateBR(to)}`, pageWidth / 2, y, { align: "center" });
+      y += 6;
+      if (productFilter.trim()) {
+        doc.text(`Filtro: ${productFilter.trim()}`, pageWidth / 2, y, { align: "center" });
+        y += 6;
+      }
+      doc.text(`Emitido em: ${new Date().toLocaleString("pt-BR")}`, pageWidth / 2, y, { align: "center" });
+      y += 10;
+
+      // Resumo
+      const boxH = 24;
+      doc.setFillColor(...PEACH);
+      doc.roundedRect(15, y, pageWidth - 30, boxH, 3, 3, "F");
+      doc.setFontSize(9);
+      doc.setTextColor(...DARK);
+      doc.setFont("helvetica", "bold");
+      doc.text("RESUMO", 20, y + 7);
+      doc.setFont("helvetica", "normal");
+      const resumo = [
+        `Receita: ${formatBRL(totals.receita)}`,
+        `CMV: ${formatBRL(totals.cmv)}`,
+        `Lucro: ${formatBRL(totals.lucro)}`,
+        `Margem: ${totals.margem.toFixed(1)}%`,
+      ].join("   |   ");
+      doc.text(resumo, 20, y + 16);
+      doc.setFontSize(7);
+      doc.setTextColor(120, 120, 120);
+      doc.text("* Apenas vendas com custo registrado.", 20, y + 21);
+      y += boxH + 8;
+
+      // Tabela por produto
+      doc.setFontSize(11);
+      doc.setTextColor(...DARK);
+      doc.setFont("helvetica", "bold");
+      doc.text("Por produto", 15, y);
+      y += 4;
+
+      autoTable(doc, {
+        head: [["Código", "Produto", "Qtd", "Receita", "CMV", "Lucro", "Margem"]],
+        body: byProduct.map((p) => [
+          p.barcode,
+          p.name,
+          String(p.qty),
+          formatBRL(p.receita),
+          formatBRL(p.cmv),
+          formatBRL(p.lucro),
+          `${p.margem.toFixed(1)}%`,
+        ]),
+        startY: y + 2,
+        headStyles: { fillColor: GOLD, textColor: WHITE, fontStyle: "bold", fontSize: 9 },
+        alternateRowStyles: { fillColor: LIGHT },
+        styles: { fontSize: 8, cellPadding: 2.5 },
+        columnStyles: {
+          2: { halign: "right" },
+          3: { halign: "right" },
+          4: { halign: "right" },
+          5: { halign: "right", fontStyle: "bold" },
+          6: { halign: "right" },
+        },
+      });
+
+      let afterY = (doc as any).lastAutoTable?.finalY ?? y + 10;
+
+      // Top lucrativos
+      if (afterY > 230) { doc.addPage(); afterY = 15; }
+      afterY += 10;
+      doc.setFontSize(11);
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(...DARK);
+      doc.text("Top 10 mais lucrativos", 15, afterY);
+      autoTable(doc, {
+        head: [["#", "Produto", "Lucro"]],
+        body: topLucrativos.map((p, i) => [String(i + 1), p.name || p.barcode, formatBRL(p.lucro)]),
+        startY: afterY + 2,
+        headStyles: { fillColor: GOLD, textColor: WHITE, fontStyle: "bold", fontSize: 9 },
+        alternateRowStyles: { fillColor: LIGHT },
+        styles: { fontSize: 8, cellPadding: 2.5 },
+        columnStyles: { 0: { cellWidth: 10 }, 2: { halign: "right", fontStyle: "bold" } },
+      });
+
+      let afterY2 = (doc as any).lastAutoTable?.finalY ?? afterY + 10;
+      if (afterY2 > 230) { doc.addPage(); afterY2 = 15; }
+      afterY2 += 10;
+      doc.setFontSize(11);
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(...DARK);
+      doc.text("10 com menor margem", 15, afterY2);
+      autoTable(doc, {
+        head: [["#", "Produto", "Margem"]],
+        body: menorMargem.map((p, i) => [String(i + 1), p.name || p.barcode, `${p.margem.toFixed(1)}%`]),
+        startY: afterY2 + 2,
+        headStyles: { fillColor: GOLD, textColor: WHITE, fontStyle: "bold", fontSize: 9 },
+        alternateRowStyles: { fillColor: LIGHT },
+        styles: { fontSize: 8, cellPadding: 2.5 },
+        columnStyles: { 0: { cellWidth: 10 }, 2: { halign: "right" } },
+      });
+
+      // Rodapé em todas páginas
+      const pageCount = doc.getNumberOfPages();
+      const pageHeight = doc.internal.pageSize.getHeight();
+      for (let i = 1; i <= pageCount; i++) {
+        doc.setPage(i);
+        doc.setFontSize(8);
+        doc.setTextColor(150, 150, 150);
+        doc.text(`Página ${i}/${pageCount} - Sistema Fiorenzza`, pageWidth / 2, pageHeight - 8, { align: "center" });
+      }
+
+      doc.save(`custos-margens-${from}-a-${to}.pdf`);
+      toast({ title: "PDF gerado", description: "Relatório de custos e margens exportado." });
+    } catch (err: any) {
+      console.error(err);
+      toast({ title: "Erro ao gerar PDF", description: err?.message || "Falha na exportação.", variant: "destructive" });
+    }
+  }
+
   return (
     <div className="space-y-4 animate-fade-in">
       <Card>
@@ -198,7 +343,11 @@ export function CostMarginView() {
               <Input value={productFilter} onChange={(e) => setProductFilter(e.target.value)} placeholder="Nome ou código de barras" />
             </div>
           </div>
-          <div className="flex justify-end">
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" onClick={handleExportPDF} disabled={loading || byProduct.length === 0}>
+              <FileDown className="h-4 w-4 mr-2" />
+              Exportar PDF
+            </Button>
             <Button onClick={load} disabled={loading}>
               {loading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
               Atualizar
