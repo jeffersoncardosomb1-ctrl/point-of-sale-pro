@@ -1,7 +1,7 @@
-import { ShoppingCart, List, BarChart3, PackagePlus, TrendingUp, History, Tag } from "lucide-react";
+import { ShoppingCart, List, BarChart3, PackagePlus, TrendingUp, History, Tag, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
-type Tab = "nova" | "lista" | "relatorios" | "compras" | "custos" | "kardex" | "preco";
+type Tab = "nova" | "lista" | "relatorios" | "compras" | "custos" | "kardex" | "preco" | "clientes";
 
 interface SalesHeaderProps {
   activeTab: Tab;
@@ -58,6 +58,14 @@ export function SalesHeader({ activeTab, onTabChange, storeName, storeLogoSrc, i
         >
           <Tag className="h-4 w-4" />
           Atualizar Preço
+        </Button>
+        <Button
+          variant={activeTab === "clientes" ? "default" : "outline"}
+          onClick={() => onTabChange("clientes")}
+          className="gap-2"
+        >
+          <Users className="h-4 w-4" />
+          Clientes
         </Button>
         {isAdmin && (
           <>
