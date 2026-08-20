@@ -13,6 +13,14 @@ import { PaymentMethod } from "@/types/sales";
 import { formatBRL, nowISO, uuid } from "@/lib/sales-utils";
 import { toast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
+import { useClientsSupabase } from "@/hooks/useClientsSupabase";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 interface NewOrderFormProps {
   onOrderCreated: (order: {
@@ -22,17 +30,21 @@ interface NewOrderFormProps {
     descontoManual?: number;
     pgtoValues?: Record<string, number>;
     observacoes?: string;
+    clientId?: string | null;
+    clientNome?: string;
   }) => Promise<Order | null>;
 }
 
 export function NewOrderForm({ onOrderCreated }: NewOrderFormProps) {
   const { firstName, lastName } = useAuth();
+  const { clients } = useClientsSupabase();
 
   const [items, setItems] = useState<OrderItem[]>([]);
   const [formasPagamento, setFormasPagamento] = useState<PaymentMethod[]>(["PIX"]);
   const [pgtoInputs, setPgtoInputs] = useState<Record<string, string>>({});
   const [observacoes, setObservacoes] = useState("");
   const [descontoManualInput, setDescontoManualInput] = useState<string>("");
+  const [clientId, setClientId] = useState<string>("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const vendedor = [firstName, lastName].filter(Boolean).join(" ") || "Vendedor";
@@ -87,6 +99,7 @@ export function NewOrderForm({ onOrderCreated }: NewOrderFormProps) {
     setPgtoInputs({});
     setObservacoes("");
     setDescontoManualInput("");
+    setClientId("");
   }
 
   async function handleSubmit() {
@@ -110,6 +123,8 @@ export function NewOrderForm({ onOrderCreated }: NewOrderFormProps) {
         descontoManual: descontoManualValue,
         pgtoValues,
         observacoes,
+        clientId: clientId || null,
+        clientNome: clients.find((c) => c.id === clientId)?.nome || "",
       });
 
       if (result) {
@@ -136,6 +151,30 @@ export function NewOrderForm({ onOrderCreated }: NewOrderFormProps) {
               <div className="flex items-center gap-2 h-10 px-3 rounded-md border bg-muted/50">
                 <User className="h-4 w-4 text-muted-foreground" />
                 <span className="text-sm font-medium">{vendedor}</span>
+              </div>
+
+              <div className="space-y-2 pt-2">
+                <Label>Cliente (opcional)</Label>
+                <div className="flex gap-2">
+                  <Select value={clientId} onValueChange={setClientId}>
+                    <SelectTrigger className="flex-1">
+                      <SelectValue placeholder="Sem identificação" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {clients.map((c) => (
+                        <SelectItem key={c.id} value={c.id}>
+                          {c.nome}
+                          {c.telefone ? ` — ${c.telefone}` : ""}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {clientId && (
+                    <Button type="button" variant="ghost" size="icon" onClick={() => setClientId("")}>
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  )}
+                </div>
               </div>
             </div>
 
