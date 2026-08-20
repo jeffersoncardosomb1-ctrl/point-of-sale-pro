@@ -274,6 +274,7 @@ export function exportSalesToExcel(filtered: Sale[]): void {
     "Pgto Dinheiro": safeNumber(s.pgtoDinheiro),
     "Pgto Boleto": safeNumber(s.pgtoBoleto),
     "Pgto Outros": safeNumber(s.pgtoOutros),
+    "Cliente": s.clientNome || "",
     "Observações": s.observacoes || "",
     "Forma de Pagamento": s.formaPagamento,
     "Status": s.status,

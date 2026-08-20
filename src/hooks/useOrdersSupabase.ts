@@ -22,6 +22,8 @@ function dbRowToOrder(row: any, items: OrderItem[]): Order {
     pgtoBoleto: Number(row.pgto_boleto || 0),
     pgtoOutros: Number(row.pgto_outros || 0),
     observacoes: row.observacoes || "",
+    clientId: row.client_id ?? null,
+    clientNome: row.client_nome || "",
     cancelMotivo: row.cancel_motivo || "",
     canceledAt: row.canceled_at || "",
     items,
@@ -116,6 +118,8 @@ export function useOrdersSupabase() {
         descontoManual?: number;
         pgtoValues?: Record<string, number>;
         observacoes?: string;
+        clientId?: string | null;
+        clientNome?: string;
       }
     ): Promise<Order | null> => {
       try {
@@ -150,6 +154,8 @@ export function useOrdersSupabase() {
             pgto_boleto: pgto["BOLETO"] || 0,
             pgto_outros: pgto["OUTROS"] || 0,
             observacoes: orderData.observacoes || "",
+            client_id: orderData.clientId || null,
+            client_nome: orderData.clientNome || "",
           })
           .select()
           .single();
@@ -189,6 +195,8 @@ export function useOrdersSupabase() {
             pgto_boleto: pgto["BOLETO"] || 0,
             pgto_outros: pgto["OUTROS"] || 0,
             observacoes: orderData.observacoes || "",
+            client_id: orderData.clientId || null,
+            client_nome: orderData.clientNome || "",
           };
         });
 

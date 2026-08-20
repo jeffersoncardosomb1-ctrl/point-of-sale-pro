@@ -31,5 +31,7 @@ export interface Order {
   observacoes: string;
   cancelMotivo: string;
   canceledAt: string;
+  clientId?: string | null;
+  clientNome?: string;
   items: OrderItem[];
 }

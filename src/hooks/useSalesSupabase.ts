@@ -26,6 +26,8 @@ function dbRowToSale(row: any): Sale {
     pgtoOutros: Number(row.pgto_outros || 0),
     observacoes: row.observacoes || "",
     status: row.status as SaleStatus,
+    clientId: row.client_id ?? null,
+    clientNome: row.client_nome || "",
     cancelMotivo: row.cancel_motivo || "",
     canceledAt: row.canceled_at || "",
   };

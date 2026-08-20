@@ -155,6 +155,7 @@ export function SalesListView({
                 <TableHead className="whitespace-nowrap">Data/Hora</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Vendedor</TableHead>
+                <TableHead>Cliente</TableHead>
                 <TableHead>Código</TableHead>
                 <TableHead>Produto</TableHead>
                 <TableHead className="text-right">Qtd</TableHead>
@@ -173,7 +174,7 @@ export function SalesListView({
               {filtered.length === 0 ? (
                 <TableRow>
                   <TableCell
-                    colSpan={15}
+                    colSpan={16}
                     className="h-24 text-center text-muted-foreground"
                   >
                     Nenhuma venda encontrada.
@@ -207,6 +208,7 @@ export function SalesListView({
                       <StatusPill status={s.status} />
                     </TableCell>
                     <TableCell className="font-semibold">{s.vendedor}</TableCell>
+                    <TableCell className="text-sm">{s.clientNome || "-"}</TableCell>
                     <TableCell className="font-mono text-sm">{s.barcode}</TableCell>
                     <TableCell>{s.productName}</TableCell>
                     <TableCell className="text-right">{s.quantidade}</TableCell>
