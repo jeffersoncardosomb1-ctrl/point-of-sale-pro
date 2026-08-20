@@ -21,6 +21,8 @@ export interface Sale {
   status: SaleStatus;
   cancelMotivo: string;
   canceledAt: string;
+  clientId?: string | null;
+  clientNome?: string;
 }
 
 export interface Seller {
