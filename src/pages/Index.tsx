@@ -13,8 +13,9 @@ import { PurchaseEntryView } from "@/components/inventory/PurchaseEntryView";
 import { CostMarginView } from "@/components/inventory/CostMarginView";
 import { KardexView } from "@/components/inventory/KardexView";
 import { UpdatePriceView } from "@/components/inventory/UpdatePriceView";
+import { ClientsView } from "@/components/clients/ClientsView";
 
-type Tab = "nova" | "lista" | "relatorios" | "compras" | "custos" | "kardex" | "preco";
+type Tab = "nova" | "lista" | "relatorios" | "compras" | "custos" | "kardex" | "preco" | "clientes";
 
 const Index = () => {
   const [tab, setTab] = useState<Tab>("nova");
@@ -92,6 +93,7 @@ const Index = () => {
               {tab === "custos" && isAdmin && <CostMarginView />}
               {tab === "kardex" && isAdmin && <KardexView />}
               {tab === "preco" && <UpdatePriceView />}
+              {tab === "clientes" && <ClientsView />}
             </>
           )}
         </div>
