@@ -14,10 +14,39 @@ export type Database = {
   }
   public: {
     Tables: {
+      clients: {
+        Row: {
+          aniversario: string | null
+          created_at: string
+          id: string
+          nome: string
+          telefone: string
+          updated_at: string
+        }
+        Insert: {
+          aniversario?: string | null
+          created_at?: string
+          id?: string
+          nome: string
+          telefone?: string
+          updated_at?: string
+        }
+        Update: {
+          aniversario?: string | null
+          created_at?: string
+          id?: string
+          nome?: string
+          telefone?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       orders: {
         Row: {
           cancel_motivo: string | null
           canceled_at: string | null
+          client_id: string | null
+          client_nome: string
           created_at: string
           forma_pagamento: string
           id: string
@@ -39,6 +68,8 @@ export type Database = {
         Insert: {
           cancel_motivo?: string | null
           canceled_at?: string | null
+          client_id?: string | null
+          client_nome?: string
           created_at?: string
           forma_pagamento?: string
           id?: string
@@ -60,6 +91,8 @@ export type Database = {
         Update: {
           cancel_motivo?: string | null
           canceled_at?: string | null
+          client_id?: string | null
+          client_nome?: string
           created_at?: string
           forma_pagamento?: string
           id?: string
@@ -78,7 +111,15 @@ export type Database = {
           valor_pago?: number
           vendedor?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "orders_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       products: {
         Row: {
@@ -231,6 +272,8 @@ export type Database = {
           barcode: string
           cancel_motivo: string | null
           canceled_at: string | null
+          client_id: string | null
+          client_nome: string
           created_at: string
           desconto: number
           desconto_percentual: number
@@ -259,6 +302,8 @@ export type Database = {
           barcode?: string
           cancel_motivo?: string | null
           canceled_at?: string | null
+          client_id?: string | null
+          client_nome?: string
           created_at?: string
           desconto?: number
           desconto_percentual?: number
@@ -287,6 +332,8 @@ export type Database = {
           barcode?: string
           cancel_motivo?: string | null
           canceled_at?: string | null
+          client_id?: string | null
+          client_nome?: string
           created_at?: string
           desconto?: number
           desconto_percentual?: number
@@ -312,6 +359,13 @@ export type Database = {
           vendedor?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "sales_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "sales_order_id_fkey"
             columns: ["order_id"]
