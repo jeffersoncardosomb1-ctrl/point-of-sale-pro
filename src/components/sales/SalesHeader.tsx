@@ -9,9 +9,10 @@ interface SalesHeaderProps {
   storeName: string; // Adicionado prop para o nome da loja
   storeLogoSrc: string; // Adicionado prop para a URL da logo
   isAdmin?: boolean;
+  canViewGiroEstoque?: boolean;
 }
 
-export function SalesHeader({ activeTab, onTabChange, storeName, storeLogoSrc, isAdmin }: SalesHeaderProps) {
+export function SalesHeader({ activeTab, onTabChange, storeName, storeLogoSrc, isAdmin, canViewGiroEstoque }: SalesHeaderProps) {
   return (
     <header className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
       <div className="flex items-center gap-3">
@@ -93,14 +94,16 @@ export function SalesHeader({ activeTab, onTabChange, storeName, storeLogoSrc, i
               <History className="h-4 w-4" />
               Kardex
             </Button>
-            <Button
-              variant={activeTab === "giro" ? "default" : "outline"}
-              onClick={() => onTabChange("giro")}
-              className="gap-2"
-            >
-              <Repeat className="h-4 w-4" />
-              Giro & Estoque
-            </Button>
+            {canViewGiroEstoque && (
+              <Button
+                variant={activeTab === "giro" ? "default" : "outline"}
+                onClick={() => onTabChange("giro")}
+                className="gap-2"
+              >
+                <Repeat className="h-4 w-4" />
+                Giro & Estoque
+              </Button>
+            )}
             <Button
               variant={activeTab === "consulta" ? "default" : "outline"}
               onClick={() => onTabChange("consulta")}
