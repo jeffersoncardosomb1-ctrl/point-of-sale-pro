@@ -26,11 +26,13 @@ function formatDateBR(value: string | null) {
   return `${d}/${m}/${y}`;
 }
 
-function buildWhatsAppLink(telefone: string): string | null {
+function buildWhatsAppLink(telefone: string, nome: string): string | null {
   const digits = telefone.replace(/\D/g, "");
   if (digits.length < 10) return null;
   const withCountry = digits.length >= 12 ? digits : `55${digits}`;
-  return `https://wa.me/${withCountry}`;
+  const firstName = nome.trim().split(/\s+/)[0] || nome;
+  const message = `Olá ${firstName}! 🎂 A equipe da Fiorenzza Beauty deseja um feliz aniversário! Preparamos uma condição especial pra você comemorar com a gente. 💛`;
+  return `https://web.whatsapp.com/send?phone=${withCountry}&text=${encodeURIComponent(message)}`;
 }
 
 interface BirthdayRow {
@@ -81,7 +83,7 @@ function BirthdaysThisMonthCard({ clients, loading }: { clients: Client[]; loadi
           day,
           status,
           statusLabel,
-          whatsappLink: buildWhatsAppLink(c.telefone),
+          whatsappLink: buildWhatsAppLink(c.telefone, c.nome),
         };
       })
       .sort((a, b) => a.day - b.day);
