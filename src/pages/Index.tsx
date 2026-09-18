@@ -19,11 +19,15 @@ import { ClientsView } from "@/components/clients/ClientsView";
 
 type Tab = "nova" | "lista" | "relatorios" | "compras" | "custos" | "kardex" | "preco" | "consulta" | "clientes" | "giro";
 
+// Restrição temporária: aba Giro & Estoque visível apenas para este usuário.
+const GIRO_ESTOQUE_ALLOWED_EMAIL = "jeffersoncardosomb@gmail.com";
+
 const Index = () => {
   const [tab, setTab] = useState<Tab>("nova");
   const { sales, loading: salesLoading, cancelSale, updateSaleDate } = useSalesSupabase();
   const { createOrder, loading: ordersLoading } = useOrdersSupabase();
-  const { isAdmin } = useAuth();
+  const { isAdmin, user } = useAuth();
+  const canViewGiroEstoque = isAdmin && user?.email === GIRO_ESTOQUE_ALLOWED_EMAIL;
 
   const STORE_NAME = "Fiorenzza Beauty";
   const STORE_LOGO_SRC = "/fiorenzza.png";
@@ -65,7 +69,14 @@ const Index = () => {
           <div className="flex justify-end mb-4">
             <UserMenu />
           </div>
-          <SalesHeader activeTab={tab} onTabChange={setTab} storeName={STORE_NAME} storeLogoSrc={STORE_LOGO_SRC} isAdmin={isAdmin} />
+          <SalesHeader
+            activeTab={tab}
+            onTabChange={setTab}
+            storeName={STORE_NAME}
+            storeLogoSrc={STORE_LOGO_SRC}
+            isAdmin={isAdmin}
+            canViewGiroEstoque={canViewGiroEstoque}
+          />
 
           {loading ? (
             <div className="flex items-center justify-center py-12">
@@ -94,7 +105,7 @@ const Index = () => {
               {tab === "compras" && isAdmin && <PurchaseEntryView />}
               {tab === "custos" && isAdmin && <CostMarginView />}
               {tab === "kardex" && isAdmin && <KardexView />}
-              {tab === "giro" && isAdmin && <StockTurnoverView />}
+              {tab === "giro" && canViewGiroEstoque && <StockTurnoverView />}
               {tab === "consulta" && isAdmin && <ProductQueryView />}
               {tab === "preco" && <UpdatePriceView />}
               {tab === "clientes" && <ClientsView />}
