@@ -1,9 +1,10 @@
 import { useMemo, useState } from "react";
-import { Users, Save, Trash2, Pencil, Search, X, Cake, Phone } from "lucide-react";
+import { Users, Save, Trash2, Pencil, Search, X, Cake, Phone, MessageCircle, PartyPopper } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import {
   Table,
   TableBody,
@@ -14,12 +15,164 @@ import {
 } from "@/components/ui/table";
 import { useClientsSupabase } from "@/hooks/useClientsSupabase";
 import { toast } from "@/hooks/use-toast";
+import { format } from "date-fns";
+import { ptBR } from "date-fns/locale";
+import type { Client } from "@/types/client";
 
 function formatDateBR(value: string | null) {
   if (!value) return "-";
   const [y, m, d] = value.split("-");
   if (!y || !m || !d) return value;
   return `${d}/${m}/${y}`;
+}
+
+function buildWhatsAppLink(telefone: string): string | null {
+  const digits = telefone.replace(/\D/g, "");
+  if (digits.length < 10) return null;
+  const withCountry = digits.length >= 12 ? digits : `55${digits}`;
+  return `https://wa.me/${withCountry}`;
+}
+
+interface BirthdayRow {
+  id: string;
+  nome: string;
+  telefone: string;
+  day: number;
+  status: "hoje" | "futuro" | "passado";
+  statusLabel: string;
+  whatsappLink: string | null;
+}
+
+function BirthdaysThisMonthCard({ clients, loading }: { clients: Client[]; loading: boolean }) {
+  const now = new Date();
+
+  const monthLabel = useMemo(() => {
+    const label = format(now, "MMMM", { locale: ptBR });
+    return label.charAt(0).toUpperCase() + label.slice(1);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const rows = useMemo<BirthdayRow[]>(() => {
+    const currentMonth = String(now.getMonth() + 1).padStart(2, "0");
+    const todayDay = now.getDate();
+
+    return clients
+      .filter((c) => c.aniversario && c.aniversario.slice(5, 7) === currentMonth)
+      .map((c) => {
+        const day = Number(c.aniversario!.slice(8, 10));
+        let status: BirthdayRow["status"];
+        let statusLabel: string;
+        if (day === todayDay) {
+          status = "hoje";
+          statusLabel = "Hoje";
+        } else if (day > todayDay) {
+          const dias = day - todayDay;
+          status = "futuro";
+          statusLabel = `Em ${dias} dia${dias > 1 ? "s" : ""}`;
+        } else {
+          const dias = todayDay - day;
+          status = "passado";
+          statusLabel = `Há ${dias} dia${dias > 1 ? "s" : ""}`;
+        }
+        return {
+          id: c.id,
+          nome: c.nome,
+          telefone: c.telefone,
+          day,
+          status,
+          statusLabel,
+          whatsappLink: buildWhatsAppLink(c.telefone),
+        };
+      })
+      .sort((a, b) => a.day - b.day);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [clients]);
+
+  return (
+    <Card className="shadow-card">
+      <CardHeader>
+        <CardTitle className="text-lg flex items-center gap-2">
+          <Cake className="h-5 w-5 text-primary" />
+          Aniversariantes de {monthLabel} ({rows.length})
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div className="rounded-lg border overflow-x-auto">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className="w-16">Dia</TableHead>
+                <TableHead>Nome</TableHead>
+                <TableHead>Telefone</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead className="text-right">Ação</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {loading ? (
+                <TableRow>
+                  <TableCell colSpan={5} className="h-24 text-center text-muted-foreground">
+                    Carregando clientes...
+                  </TableCell>
+                </TableRow>
+              ) : rows.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={5} className="h-24 text-center text-muted-foreground">
+                    Nenhum aniversariante em {monthLabel}.
+                  </TableCell>
+                </TableRow>
+              ) : (
+                rows.map((r) => (
+                  <TableRow key={r.id}>
+                    <TableCell className="font-semibold">{String(r.day).padStart(2, "0")}</TableCell>
+                    <TableCell className="font-semibold">{r.nome}</TableCell>
+                    <TableCell>
+                      <span className="flex items-center gap-1 text-sm">
+                        <Phone className="h-3 w-3 text-muted-foreground" />
+                        {r.telefone || "-"}
+                      </span>
+                    </TableCell>
+                    <TableCell>
+                      <Badge
+                        variant="outline"
+                        className={
+                          r.status === "hoje"
+                            ? "text-success border-success/30"
+                            : r.status === "passado"
+                            ? "text-muted-foreground border-border"
+                            : "text-foreground border-border"
+                        }
+                      >
+                        {r.status === "hoje" && <PartyPopper className="h-3 w-3 mr-1" />}
+                        {r.statusLabel}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-right">
+                      {r.whatsappLink ? (
+                        <Button variant="ghost" size="sm" asChild>
+                          <a
+                            href={r.whatsappLink}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            title="Enviar mensagem no WhatsApp"
+                            className="text-success hover:text-success"
+                          >
+                            <MessageCircle className="h-4 w-4" />
+                          </a>
+                        </Button>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">-</span>
+                      )}
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        </div>
+      </CardContent>
+    </Card>
+  );
 }
 
 export function ClientsView() {
@@ -65,6 +218,8 @@ export function ClientsView() {
 
   return (
     <div className="space-y-4 animate-fade-in">
+      <BirthdaysThisMonthCard clients={clients} loading={loading} />
+
       <Card className="shadow-card">
         <CardHeader>
           <CardTitle className="text-lg flex items-center gap-2">
