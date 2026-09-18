@@ -14,7 +14,6 @@ interface ProductRow {
   product_name: string;
   price: number;
   cost_avg: number;
-  stock: number;
   ultima_venda: string | null;
   ultima_compra: string | null;
 }
@@ -41,7 +40,7 @@ export function ProductQueryView() {
     try {
       const { data: products, error } = await supabase
         .from("products")
-        .select("id, barcode, product_name, price, cost_avg, stock")
+        .select("id, barcode, product_name, price, cost_avg")
         .or(`product_name.ilike.%${q}%,barcode.ilike.%${q}%`)
         .order("product_name", { ascending: true })
         .limit(50);
@@ -82,7 +81,6 @@ export function ProductQueryView() {
         product_name: p.product_name,
         price: Number(p.price) || 0,
         cost_avg: Number(p.cost_avg) || 0,
-        stock: Number(p.stock) || 0,
         ultima_venda: lastSaleByBarcode.get(p.barcode) || null,
         ultima_compra: lastPurchaseByBarcode.get(p.barcode) || null,
       }));
@@ -137,7 +135,6 @@ export function ProductQueryView() {
                 <th className="px-3 py-2">Última compra</th>
                 <th className="px-3 py-2 text-right">Custo médio</th>
                 <th className="px-3 py-2 text-right">Valor de venda</th>
-                <th className="px-3 py-2 text-right">Estoque</th>
               </tr>
             </thead>
             <tbody>
@@ -149,12 +146,11 @@ export function ProductQueryView() {
                   <td className="px-3 py-2 whitespace-nowrap">{formatDateBR(r.ultima_compra)}</td>
                   <td className="px-3 py-2 text-right">{formatBRL(r.cost_avg)}</td>
                   <td className="px-3 py-2 text-right font-medium">{formatBRL(r.price)}</td>
-                  <td className={`px-3 py-2 text-right ${r.stock < 0 ? "text-destructive" : ""}`}>{r.stock}</td>
                 </tr>
               ))}
               {rows.length === 0 && (
                 <tr>
-                  <td colSpan={7} className="px-3 py-8 text-center text-muted-foreground">
+                  <td colSpan={6} className="px-3 py-8 text-center text-muted-foreground">
                     {searched ? "Nenhum produto encontrado." : "Informe um nome ou código de barras e clique em Buscar."}
                   </td>
                 </tr>

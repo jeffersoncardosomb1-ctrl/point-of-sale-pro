@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
-import { Loader2, TrendingUp, TrendingDown, DollarSign, Percent, AlertTriangle, Save, FileDown } from "lucide-react";
+import { Loader2, TrendingUp, TrendingDown, DollarSign, Percent, AlertTriangle, Save, FileDown, RefreshCw } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { formatBRL } from "@/lib/sales-utils";
 import { useAuth } from "@/hooks/useAuth";
@@ -42,6 +42,7 @@ export function CostMarginView() {
   const [costInputs, setCostInputs] = useState<Record<string, string>>({});
   const [savingId, setSavingId] = useState<string | null>(null);
   const [propagate, setPropagate] = useState(true);
+  const [bulkUpdating, setBulkUpdating] = useState(false);
 
   async function load() {
     setLoading(true);
@@ -135,6 +136,85 @@ export function CostMarginView() {
       toast({ title: "Erro ao salvar", description: err?.message || "Falha ao atualizar custo.", variant: "destructive" });
     } finally {
       setSavingId(null);
+    }
+  }
+
+  async function handleBulkUpdateFromProductCost() {
+    const targets = semCustoFiltered;
+    if (targets.length === 0) {
+      toast({ title: "Nada para atualizar", description: "Não há vendas sem custo no período/filtro atual." });
+      return;
+    }
+    setBulkUpdating(true);
+    try {
+      const barcodes = Array.from(new Set(targets.map((r) => r.barcode).filter(Boolean)));
+      const { data: products, error: prodErr } = await supabase
+        .from("products")
+        .select("barcode, cost_avg")
+        .in("barcode", barcodes);
+      if (prodErr) throw prodErr;
+
+      const costByBarcode = new Map<string, number>();
+      (products || []).forEach((p) => {
+        const c = Number(p.cost_avg) || 0;
+        if (c > 0) costByBarcode.set(p.barcode, c);
+      });
+
+      const toUpdate = targets.filter((r) => costByBarcode.has(r.barcode));
+      if (toUpdate.length === 0) {
+        toast({
+          title: "Nenhum custo cadastrado encontrado",
+          description: "Cadastre o custo do produto (ex.: registrando uma compra) e tente novamente.",
+        });
+        return;
+      }
+
+      const results = await Promise.allSettled(
+        toUpdate.map((r) => {
+          const unit = costByBarcode.get(r.barcode)!;
+          const totalCost = unit * Number(r.quantidade || 0);
+          return supabase
+            .from("sales")
+            .update({ unit_cost: unit, total_cost: totalCost })
+            .eq("id", r.id)
+            .then(({ error }) => {
+              if (error) throw error;
+              return { id: r.id, unit, totalCost };
+            });
+        })
+      );
+
+      const updatedById = new Map<string, { unit: number; totalCost: number }>();
+      let failures = 0;
+      results.forEach((res) => {
+        if (res.status === "fulfilled") {
+          updatedById.set(res.value.id, { unit: res.value.unit, totalCost: res.value.totalCost });
+        } else {
+          failures++;
+        }
+      });
+
+      if (updatedById.size > 0) {
+        setRows((prev) =>
+          prev.map((r) => {
+            const u = updatedById.get(r.id);
+            return u ? { ...r, unit_cost: u.unit, total_cost: u.totalCost } : r;
+          })
+        );
+      }
+
+      toast({
+        title: "Custos atualizados",
+        description: `${updatedById.size} venda(s) atualizada(s) com o custo cadastrado do produto.${
+          failures > 0 ? ` ${failures} falharam.` : ""
+        }`,
+        variant: failures > 0 ? "destructive" : undefined,
+      });
+    } catch (err: any) {
+      console.error(err);
+      toast({ title: "Erro ao atualizar", description: err?.message || "Falha ao atualizar custos.", variant: "destructive" });
+    } finally {
+      setBulkUpdating(false);
     }
   }
 
@@ -449,16 +529,32 @@ export function CostMarginView() {
           <CardContent className="space-y-3">
             <div className="flex items-center justify-between flex-wrap gap-2">
               <p className="text-xs text-muted-foreground">
-                Informe manualmente o custo unitário para incluir essas vendas nos cálculos de margem.
+                Informe manualmente o custo unitário, ou clique em "Atualizar custos" para preencher
+                automaticamente com o custo já cadastrado do produto.
               </p>
-              <label className="flex items-center gap-2 text-xs">
-                <input
-                  type="checkbox"
-                  checked={propagate}
-                  onChange={(e) => setPropagate(e.target.checked)}
-                />
-                Atualizar custo médio do produto (se ainda não tiver)
-              </label>
+              <div className="flex items-center gap-3 flex-wrap">
+                <label className="flex items-center gap-2 text-xs">
+                  <input
+                    type="checkbox"
+                    checked={propagate}
+                    onChange={(e) => setPropagate(e.target.checked)}
+                  />
+                  Atualizar custo médio do produto (se ainda não tiver)
+                </label>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={handleBulkUpdateFromProductCost}
+                  disabled={bulkUpdating || semCustoFiltered.length === 0}
+                >
+                  {bulkUpdating ? (
+                    <Loader2 className="h-3 w-3 mr-2 animate-spin" />
+                  ) : (
+                    <RefreshCw className="h-3 w-3 mr-2" />
+                  )}
+                  Atualizar custos cadastrados
+                </Button>
+              </div>
             </div>
             <div className="overflow-auto max-h-96 rounded-lg border">
               <table className="w-full text-sm">
