@@ -1,7 +1,7 @@
-import { ShoppingCart, List, BarChart3, PackagePlus, TrendingUp, History, Tag, Users, PackageSearch } from "lucide-react";
+import { ShoppingCart, List, BarChart3, PackagePlus, TrendingUp, History, Tag, Users, PackageSearch, Repeat } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
-type Tab = "nova" | "lista" | "relatorios" | "compras" | "custos" | "kardex" | "preco" | "consulta" | "clientes";
+type Tab = "nova" | "lista" | "relatorios" | "compras" | "custos" | "kardex" | "preco" | "consulta" | "clientes" | "giro";
 
 interface SalesHeaderProps {
   activeTab: Tab;
@@ -92,6 +92,14 @@ export function SalesHeader({ activeTab, onTabChange, storeName, storeLogoSrc, i
             >
               <History className="h-4 w-4" />
               Kardex
+            </Button>
+            <Button
+              variant={activeTab === "giro" ? "default" : "outline"}
+              onClick={() => onTabChange("giro")}
+              className="gap-2"
+            >
+              <Repeat className="h-4 w-4" />
+              Giro & Estoque
             </Button>
             <Button
               variant={activeTab === "consulta" ? "default" : "outline"}
