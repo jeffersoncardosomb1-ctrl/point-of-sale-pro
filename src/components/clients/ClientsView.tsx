@@ -32,7 +32,7 @@ function buildWhatsAppLink(telefone: string, nome: string): string | null {
   const withCountry = digits.length >= 12 ? digits : `55${digits}`;
   const firstName = nome.trim().split(/\s+/)[0] || nome;
   const message = `Olá ${firstName}! 🎂 A equipe da Fiorenzza Beauty deseja um feliz aniversário! Preparamos uma condição especial pra você comemorar com a gente. 💛`;
-  return `https://wa.me/${withCountry}?text=${encodeURIComponent(message)}`;
+  return `whatsapp://send?phone=${withCountry}&text=${encodeURIComponent(message)}`;
 }
 
 async function copyPhoneToClipboard(telefone: string) {
@@ -164,8 +164,6 @@ function BirthdaysThisMonthCard({ clients, loading }: { clients: Client[]; loadi
                           <Button variant="ghost" size="sm" asChild>
                             <a
                               href={r.whatsappLink}
-                              target="_blank"
-                              rel="noopener noreferrer"
                               title="Enviar mensagem no WhatsApp"
                               className="text-success hover:text-success"
                             >
