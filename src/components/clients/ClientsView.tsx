@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Users, Save, Trash2, Pencil, Search, X, Cake, Phone, MessageCircle, PartyPopper } from "lucide-react";
+import { Users, Save, Trash2, Pencil, Search, X, Cake, Phone, MessageCircle, PartyPopper, Copy } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -32,7 +32,16 @@ function buildWhatsAppLink(telefone: string, nome: string): string | null {
   const withCountry = digits.length >= 12 ? digits : `55${digits}`;
   const firstName = nome.trim().split(/\s+/)[0] || nome;
   const message = `Olá ${firstName}! 🎂 A equipe da Fiorenzza Beauty deseja um feliz aniversário! Preparamos uma condição especial pra você comemorar com a gente. 💛`;
-  return `https://web.whatsapp.com/send?phone=${withCountry}&text=${encodeURIComponent(message)}`;
+  return `https://wa.me/${withCountry}?text=${encodeURIComponent(message)}`;
+}
+
+async function copyPhoneToClipboard(telefone: string) {
+  try {
+    await navigator.clipboard.writeText(telefone);
+    toast({ title: "Telefone copiado", description: telefone });
+  } catch {
+    toast({ title: "Não foi possível copiar", description: "Copie manualmente: " + telefone, variant: "destructive" });
+  }
 }
 
 interface BirthdayRow {
@@ -150,21 +159,34 @@ function BirthdaysThisMonthCard({ clients, loading }: { clients: Client[]; loadi
                       </Badge>
                     </TableCell>
                     <TableCell className="text-right">
-                      {r.whatsappLink ? (
-                        <Button variant="ghost" size="sm" asChild>
-                          <a
-                            href={r.whatsappLink}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            title="Enviar mensagem no WhatsApp"
-                            className="text-success hover:text-success"
+                      <div className="flex items-center justify-end gap-1">
+                        {r.whatsappLink && (
+                          <Button variant="ghost" size="sm" asChild>
+                            <a
+                              href={r.whatsappLink}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              title="Enviar mensagem no WhatsApp"
+                              className="text-success hover:text-success"
+                            >
+                              <MessageCircle className="h-4 w-4" />
+                            </a>
+                          </Button>
+                        )}
+                        {r.telefone && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            title="Copiar telefone (caso o WhatsApp não abra)"
+                            onClick={() => copyPhoneToClipboard(r.telefone)}
                           >
-                            <MessageCircle className="h-4 w-4" />
-                          </a>
-                        </Button>
-                      ) : (
-                        <span className="text-xs text-muted-foreground">-</span>
-                      )}
+                            <Copy className="h-4 w-4" />
+                          </Button>
+                        )}
+                        {!r.whatsappLink && !r.telefone && (
+                          <span className="text-xs text-muted-foreground">-</span>
+                        )}
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))
