@@ -27,6 +27,45 @@ function formatDateBR(value: string | null) {
   return `${d}/${m}/${y}`;
 }
 
+function parseBirthday(value: unknown): string | null {
+  if (value === null || value === undefined || value === "") return null;
+  if (value instanceof Date && !isNaN(value.getTime())) {
+    const y = value.getFullYear();
+    const m = String(value.getMonth() + 1).padStart(2, "0");
+    const d = String(value.getDate()).padStart(2, "0");
+    return `${y}-${m}-${d}`;
+  }
+  if (typeof value === "number") {
+    const parsed = XLSX.SSF.parse_date_code(value);
+    if (!parsed) return null;
+    return `${parsed.y}-${String(parsed.m).padStart(2, "0")}-${String(parsed.d).padStart(2, "0")}`;
+  }
+  const text = String(value).trim();
+  let match = text.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+  if (match) return `${match[1]}-${match[2].padStart(2, "0")}-${match[3].padStart(2, "0")}`;
+  match = text.match(/^(\d{1,2})[/\-.](\d{1,2})[/\-.](\d{2,4})$/);
+  if (match) {
+    const year = match[3].length === 2 ? `20${match[3]}` : match[3];
+    return `${year}-${match[2].padStart(2, "0")}-${match[1].padStart(2, "0")}`;
+  }
+  return null;
+}
+
+function normalizeKey(key: string) {
+  return key
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .trim()
+    .toLowerCase();
+}
+
+function pickField(row: Record<string, unknown>, candidates: string[]): unknown {
+  for (const key of Object.keys(row)) {
+    if (candidates.includes(normalizeKey(key))) return row[key];
+  }
+  return undefined;
+}
+
 function buildWhatsAppLink(telefone: string, nome: string): string | null {
   const digits = telefone.replace(/\D/g, "");
   if (digits.length < 10) return null;
