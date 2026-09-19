@@ -238,7 +238,9 @@ function BirthdaysThisMonthCard({ clients, loading }: { clients: Client[]; loadi
 }
 
 export function ClientsView() {
-  const { clients, loading, createClient, updateClient, deleteClient } = useClientsSupabase();
+  const { clients, loading, createClient, createClientsBulk, updateClient, deleteClient } = useClientsSupabase();
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [importing, setImporting] = useState(false);
 
   const [nome, setNome] = useState("");
   const [telefone, setTelefone] = useState("");
