@@ -1,5 +1,6 @@
-import { useMemo, useState } from "react";
-import { Users, Save, Trash2, Pencil, Search, X, Cake, Phone, MessageCircle, PartyPopper, Copy } from "lucide-react";
+import { useMemo, useRef, useState } from "react";
+import { Users, Save, Trash2, Pencil, Search, X, Cake, Phone, MessageCircle, PartyPopper, Copy, Upload, Download, Loader2 } from "lucide-react";
+import * as XLSX from "xlsx";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -24,6 +25,45 @@ function formatDateBR(value: string | null) {
   const [y, m, d] = value.split("-");
   if (!y || !m || !d) return value;
   return `${d}/${m}/${y}`;
+}
+
+function parseBirthday(value: unknown): string | null {
+  if (value === null || value === undefined || value === "") return null;
+  if (value instanceof Date && !isNaN(value.getTime())) {
+    const y = value.getFullYear();
+    const m = String(value.getMonth() + 1).padStart(2, "0");
+    const d = String(value.getDate()).padStart(2, "0");
+    return `${y}-${m}-${d}`;
+  }
+  if (typeof value === "number") {
+    const parsed = XLSX.SSF.parse_date_code(value);
+    if (!parsed) return null;
+    return `${parsed.y}-${String(parsed.m).padStart(2, "0")}-${String(parsed.d).padStart(2, "0")}`;
+  }
+  const text = String(value).trim();
+  let match = text.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+  if (match) return `${match[1]}-${match[2].padStart(2, "0")}-${match[3].padStart(2, "0")}`;
+  match = text.match(/^(\d{1,2})[/\-.](\d{1,2})[/\-.](\d{2,4})$/);
+  if (match) {
+    const year = match[3].length === 2 ? `20${match[3]}` : match[3];
+    return `${year}-${match[2].padStart(2, "0")}-${match[1].padStart(2, "0")}`;
+  }
+  return null;
+}
+
+function normalizeKey(key: string) {
+  return key
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .trim()
+    .toLowerCase();
+}
+
+function pickField(row: Record<string, unknown>, candidates: string[]): unknown {
+  for (const key of Object.keys(row)) {
+    if (candidates.includes(normalizeKey(key))) return row[key];
+  }
+  return undefined;
 }
 
 function buildWhatsAppLink(telefone: string, nome: string): string | null {
@@ -198,7 +238,9 @@ function BirthdaysThisMonthCard({ clients, loading }: { clients: Client[]; loadi
 }
 
 export function ClientsView() {
-  const { clients, loading, createClient, updateClient, deleteClient } = useClientsSupabase();
+  const { clients, loading, createClient, createClientsBulk, updateClient, deleteClient } = useClientsSupabase();
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [importing, setImporting] = useState(false);
 
   const [nome, setNome] = useState("");
   const [telefone, setTelefone] = useState("");
@@ -238,9 +280,114 @@ export function ClientsView() {
     if (ok) resetForm();
   }
 
+  function downloadTemplate() {
+    const ws = XLSX.utils.json_to_sheet([
+      { Nome: "Maria Silva", Telefone: "(11) 91234-5678", Aniversario: "25/03/1990" },
+    ]);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Clientes");
+    XLSX.writeFile(wb, "modelo_clientes.xlsx");
+  }
+
+  async function handleFileSelected(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    setImporting(true);
+    try {
+      const buffer = await file.arrayBuffer();
+      const wb = XLSX.read(buffer, { type: "array", cellDates: true });
+      const sheet = wb.Sheets[wb.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet, { defval: "" });
+
+      const existing = new Set(clients.map((c) => c.nome.trim().toLowerCase()));
+      const parsed: { nome: string; telefone: string; aniversario: string | null }[] = [];
+      let ignored = 0;
+
+      for (const row of rows) {
+        const nomeValue = String(pickField(row, ["nome", "cliente", "nome do cliente"]) ?? "").trim();
+        if (!nomeValue) {
+          ignored++;
+          continue;
+        }
+        const key = nomeValue.toLowerCase();
+        if (existing.has(key)) {
+          ignored++;
+          continue;
+        }
+        existing.add(key);
+        parsed.push({
+          nome: nomeValue,
+          telefone: String(pickField(row, ["telefone", "celular", "whatsapp", "fone", "contato"]) ?? "").trim(),
+          aniversario: parseBirthday(pickField(row, ["aniversario", "nascimento", "data de nascimento", "data nascimento", "data"])),
+        });
+      }
+
+      if (parsed.length === 0) {
+        toast({
+          title: "Nada para importar",
+          description: "A planilha não tem clientes novos. Verifique a coluna Nome.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      const inserted = await createClientsBulk(parsed);
+      toast({
+        title: "Importação concluída",
+        description: `${inserted} cliente(s) importado(s).${ignored > 0 ? ` ${ignored} linha(s) ignorada(s).` : ""}`,
+      });
+    } catch (error) {
+      console.error("Erro ao importar planilha:", error);
+      toast({
+        title: "Erro ao ler a planilha",
+        description: "Confira se o arquivo é .xlsx ou .csv válido.",
+        variant: "destructive",
+      });
+    } finally {
+      setImporting(false);
+    }
+  }
+
   return (
     <div className="space-y-4 animate-fade-in">
       <BirthdaysThisMonthCard clients={clients} loading={loading} />
+
+      <Card className="shadow-card">
+        <CardHeader>
+          <CardTitle className="text-lg flex items-center gap-2">
+            <Upload className="h-5 w-5 text-primary" />
+            Importar clientes por planilha
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <p className="text-sm text-muted-foreground">
+            Use uma planilha com as colunas <strong>Nome</strong>, <strong>Telefone</strong> e{" "}
+            <strong>Aniversario</strong> (dd/mm/aaaa). Clientes com nome já cadastrado são ignorados.
+          </p>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".xlsx,.xls,.csv"
+            className="hidden"
+            onChange={handleFileSelected}
+          />
+          <div className="flex flex-wrap gap-2">
+            <Button type="button" onClick={() => fileInputRef.current?.click()} disabled={importing}>
+              {importing ? (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <Upload className="h-4 w-4 mr-2" />
+              )}
+              {importing ? "Importando..." : "Enviar planilha"}
+            </Button>
+            <Button type="button" variant="outline" onClick={downloadTemplate}>
+              <Download className="h-4 w-4 mr-2" />
+              Baixar modelo
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
 
       <Card className="shadow-card">
         <CardHeader>

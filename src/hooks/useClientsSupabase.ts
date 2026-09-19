@@ -108,5 +108,29 @@ export function useClientsSupabase() {
     return true;
   }, []);
 
-  return { clients, loading, createClient, updateClient, deleteClient, refetch: fetchClients };
+  const createClientsBulk = useCallback(
+    async (rows: { nome: string; telefone: string; aniversario: string | null }[]) => {
+      if (rows.length === 0) return 0;
+      let inserted = 0;
+      for (let i = 0; i < rows.length; i += 200) {
+        const chunk = rows.slice(i, i + 200);
+        const { data, error } = await supabase.from("clients").insert(chunk).select();
+        if (error) {
+          console.error("Erro ao importar clientes:", error);
+          toast({
+            title: "Erro na importação",
+            description: "Alguns clientes não puderam ser importados.",
+            variant: "destructive",
+          });
+          break;
+        }
+        inserted += data?.length || 0;
+      }
+      await fetchClients();
+      return inserted;
+    },
+    [fetchClients]
+  );
+
+  return { clients, loading, createClient, createClientsBulk, updateClient, deleteClient, refetch: fetchClients };
 }
