@@ -729,6 +729,10 @@ export type Database = {
       }
     }
     Functions: {
+      apply_initial_avg_cost: {
+        Args: { _product_ids: string[] }
+        Returns: number
+      }
       apply_purchase_entry: {
         Args: { _file_name: string; _items: Json; _vendedor: string }
         Returns: string
@@ -789,6 +793,21 @@ export type Database = {
       merge_products: {
         Args: { _source_id: string; _target_id: string }
         Returns: undefined
+      }
+      preview_initial_avg_cost: {
+        Args: never
+        Returns: {
+          barcode: string
+          custo_atual: number
+          custo_calculado: number
+          diferenca: number
+          media_simples: number
+          product_id: string
+          product_name: string
+          qtd_comprada: number
+          qtd_entradas: number
+          saldo_atual: number
+        }[]
       }
       register_count_entry: {
         Args: {

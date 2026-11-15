@@ -2,15 +2,16 @@ import { useState } from "react";
 import { Helmet } from "react-helmet";
 import { useNavigate } from "react-router-dom";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Users, BarChart3, ArrowLeft, Package } from "lucide-react"; // Added Package icon
+import { Users, BarChart3, ArrowLeft, Package, Calculator } from "lucide-react";
 import { PendingUsersManager } from "@/components/admin/PendingUsersManager";
 import { AdminSalesDashboard } from "@/components/admin/AdminSalesDashboard";
-import { ProductCatalogImporter } from "@/components/admin/ProductCatalogImporter"; // Import new component
+import { ProductCatalogImporter } from "@/components/admin/ProductCatalogImporter";
+import { InitialCostView } from "@/components/stock/InitialCostView";
 import { useSalesSupabase } from "@/hooks/useSalesSupabase";
 import { UserMenu } from "@/components/layout/UserMenu";
 import { Button } from "@/components/ui/button";
 
-type AdminTab = "users" | "dashboard" | "products"; // Added 'products' tab
+type AdminTab = "users" | "dashboard" | "products" | "custo";
 
 const AdminPage = () => {
   const navigate = useNavigate();
@@ -56,7 +57,7 @@ const AdminPage = () => {
           </header>
 
           <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as AdminTab)} className="w-full">
-            <TabsList className="grid w-full grid-cols-3"> {/* Changed to grid-cols-3 */}
+            <TabsList className="grid w-full grid-cols-2 sm:grid-cols-4 h-auto">
               <TabsTrigger value="users" className="flex items-center gap-2">
                 <Users className="h-4 w-4" />
                 Usuários
@@ -69,6 +70,10 @@ const AdminPage = () => {
                 <Package className="h-4 w-4" />
                 Produtos
               </TabsTrigger>
+              <TabsTrigger value="custo" className="flex items-center gap-2">
+                <Calculator className="h-4 w-4" />
+                Custo inicial
+              </TabsTrigger>
             </TabsList>
             <TabsContent value="users" className="mt-4">
               <PendingUsersManager />
@@ -78,6 +83,9 @@ const AdminPage = () => {
             </TabsContent>
             <TabsContent value="products" className="mt-4"> {/* New tab content */}
               <ProductCatalogImporter onImportComplete={handleProductImportComplete} />
+            </TabsContent>
+            <TabsContent value="custo" className="mt-4">
+              <InitialCostView />
             </TabsContent>
           </Tabs>
         </div>
