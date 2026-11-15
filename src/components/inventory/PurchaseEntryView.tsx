@@ -9,6 +9,7 @@ import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { formatBRL } from "@/lib/sales-utils";
+import { PurchaseEntriesList } from "@/components/inventory/PurchaseEntriesList";
 
 interface ParsedItem {
   product_name: string;
@@ -242,6 +243,8 @@ export function PurchaseEntryView() {
           )}
         </CardContent>
       </Card>
+
+      <PurchaseEntriesList refreshKey={done?.entryId ?? ""} />
     </div>
   );
 }

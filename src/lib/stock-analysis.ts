@@ -9,9 +9,9 @@ import { supabase } from "@/integrations/supabase/client";
  *
  * Uma saída (`SAIDA`) só é considerada "saída real" quando está vinculada a
  * uma venda (`reference_type = 'sale'`) que ainda está com `status = 'ATIVA'`.
- * Vendas canceladas ou excluídas deixam o registro de saída no Kardex sem
- * reverter o estoque — por isso essas saídas "fantasma" são identificadas e
- * excluídas do cálculo de consumo/giro.
+ * Vendas canceladas ou excluídas: a saída é descartada do cálculo de consumo/giro.
+ * (Desde o módulo de Estoque o cancelamento também gera ESTORNO_VENDA, que é
+ * ignorado aqui para não contar o efeito duas vezes.)
  */
 
 export type MovementKind = "ENTRADA" | "SAIDA_REAL" | "SAIDA_INVALIDA" | "AJUSTE" | "OUTRO";
@@ -134,8 +134,18 @@ export async function fetchStockAnalysisRaw(): Promise<StockAnalysisRaw> {
 }
 
 function classifyMovement(m: RawMovement, saleStatusById: Map<string, string>): MovementKind {
-  if (m.movement_type === "ENTRADA") return "ENTRADA";
-  if (m.movement_type === "SAIDA") {
+  // Tipos atuais do módulo de Estoque (quantidade com sinal) e os antigos, por compatibilidade.
+  if (m.movement_type === "ENTRADA" || m.movement_type === "ENTRADA_NOTA" || m.movement_type === "ESTORNO_NOTA")
+    return "ENTRADA";
+  // O estorno anula a saída da venda cancelada, que já é descartada como SAIDA_INVALIDA.
+  if (m.movement_type === "ESTORNO_VENDA") return "OUTRO";
+  if (
+    m.movement_type === "AJUSTE_INVENTARIO" ||
+    m.movement_type === "AJUSTE_MANUAL" ||
+    m.movement_type === "MESCLAGEM"
+  )
+    return "AJUSTE";
+  if (m.movement_type === "SAIDA" || m.movement_type === "SAIDA_VENDA") {
     if (m.reference_type === "sale") {
       const status = m.reference_id ? saleStatusById.get(m.reference_id) : undefined;
       return status === "ATIVA" ? "SAIDA_REAL" : "SAIDA_INVALIDA";
@@ -192,15 +202,18 @@ export function computeStockAnalysis(
     let balance = 0;
     const timeline: TimelineEntry[] = rows.map((m) => {
       const kind = classifyMovement(m, raw.saleStatusById);
+      const rawQty = Number(m.quantidade) || 0;
+      // Saídas são tratadas em valor absoluto (o kardex novo grava a saída com sinal negativo)
+      const qty = kind === "SAIDA_REAL" || kind === "SAIDA_INVALIDA" ? Math.abs(rawQty) : rawQty;
       let delta = 0;
-      if (kind === "ENTRADA") delta = Number(m.quantidade) || 0;
-      else if (kind === "SAIDA_REAL") delta = -(Number(m.quantidade) || 0);
-      else if (kind === "AJUSTE") delta = Number(m.quantidade) || 0;
+      if (kind === "ENTRADA") delta = qty;
+      else if (kind === "SAIDA_REAL") delta = -qty;
+      else if (kind === "AJUSTE") delta = qty;
       balance += delta;
       return {
         date: new Date(m.created_at).getTime(),
         kind,
-        quantidade: Number(m.quantidade) || 0,
+        quantidade: qty,
         custoUnitario: Number(m.custo_unitario) || 0,
         custoMedioApos: Number(m.custo_medio_apos) || 0,
         balanceAfter: balance,

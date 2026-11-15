@@ -1,5 +1,6 @@
 import { useState, useMemo, useEffect } from "react";
-import { Plus, Camera, Trash2, Loader2 } from "lucide-react";
+import { Plus, Camera, Trash2, Loader2, AlertTriangle, Package } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -11,9 +12,28 @@ import { supabase } from "@/integrations/supabase/client"; // Importar supabase
 
 interface AddItemFormProps {
   onAddItem: (item: OrderItem) => void;
+  /** Itens já no pedido, para descontar do saldo disponível. */
+  cartItems?: OrderItem[];
 }
 
-export function AddItemForm({ onAddItem }: AddItemFormProps) {
+interface StockInfo {
+  barcode: string;
+  stock: number;
+  pendente: boolean;
+}
+
+export function AddItemForm({ onAddItem, cartItems = [] }: AddItemFormProps) {
+  const [stockInfo, setStockInfo] = useState<StockInfo | null>(null);
+  const { data: settings } = useQuery({
+    queryKey: ["stock-settings"],
+    queryFn: async () => {
+      const { data, error } = await supabase.from("stock_settings").select("*").eq("id", 1).maybeSingle();
+      if (error) throw error;
+      return data;
+    },
+    staleTime: 60_000,
+  });
+  const bloquearSemSaldo = settings?.bloquear_venda_sem_saldo === true;
   const [barcode, setBarcode] = useState("");
   const [productName, setProductName] = useState("");
   const [quantidade, setQuantidade] = useState("1");
@@ -41,27 +61,40 @@ export function AddItemForm({ onAddItem }: AddItemFormProps) {
         setIsSearchingProduct(true);
         setProductName(""); // Limpa o nome anterior enquanto busca
         setProductFoundBySearch(false); // Reseta o estado de busca
-        console.log("Buscando produto no catálogo para o código de barras:", trimmedBarcode);
+        setStockInfo(null);
         try {
-          const { data, error } = await supabase
-            .from("products")
-            .select("product_name, price")
-            .eq("barcode", trimmedBarcode)
-            .maybeSingle();
+          // Aceita código principal ou alternativo
+          const { data: productId, error: resolveError } = await supabase.rpc("resolve_product", {
+            _barcode: trimmedBarcode,
+          });
+          if (resolveError) throw resolveError;
+
+          const { data, error } = productId
+            ? await supabase
+                .from("products")
+                .select("barcode, product_name, price, stock, pendente_identificacao")
+                .eq("id", productId)
+                .maybeSingle()
+            : { data: null, error: null };
 
           if (error) {
             throw error;
           }
 
           if (data) {
-            console.log("Produto encontrado no Supabase:", data);
             setProductName(data.product_name);
+            setStockInfo({
+              barcode: data.barcode,
+              stock: Number(data.stock),
+              pendente: data.pendente_identificacao,
+            });
             if (data.price > 0) {
               setValorUnitario(data.price.toString().replace(".", ","));
             }
             setProductFoundBySearch(true);
             toast({ title: "Produto encontrado!", description: data.product_name });
           } else {
+            setStockInfo({ barcode: trimmedBarcode, stock: 0, pendente: false });
             toast({ title: "Produto não encontrado", description: "Por favor, digite o nome e valor manualmente." });
           }
         } catch (error) {
@@ -73,6 +106,7 @@ export function AddItemForm({ onAddItem }: AddItemFormProps) {
       } else {
         setProductName(""); // Limpa o nome se o código de barras estiver vazio
         setProductFoundBySearch(false);
+        setStockInfo(null);
       }
     };
 
@@ -86,6 +120,14 @@ export function AddItemForm({ onAddItem }: AddItemFormProps) {
     };
   }, [barcode]);
 
+  const qtyInCart = stockInfo
+    ? cartItems
+        .filter((i) => i.barcode === stockInfo.barcode || i.barcode === barcode.trim())
+        .reduce((sum, i) => sum + i.quantidade, 0)
+    : 0;
+  const disponivel = stockInfo ? stockInfo.stock - qtyInCart : 0;
+  const excedeSaldo = !!stockInfo && safeNumber(quantidade) > disponivel;
+
   function resetForm() {
     setBarcode("");
     setProductName("");
@@ -93,6 +135,7 @@ export function AddItemForm({ onAddItem }: AddItemFormProps) {
     setValorUnitario("");
     setDescontoPercentual("");
     setProductFoundBySearch(false);
+    setStockInfo(null);
   }
 
   async function handleAddItem() {
@@ -117,6 +160,20 @@ export function AddItemForm({ onAddItem }: AddItemFormProps) {
     if (vu <= 0) {
       toast({ title: "Erro", description: "Valor unitário deve ser maior que zero.", variant: "destructive" });
       return;
+    }
+    if (excedeSaldo) {
+      if (bloquearSemSaldo) {
+        toast({
+          title: "Saldo insuficiente",
+          description: `Disponível: ${disponivel}. A venda acima do saldo está bloqueada.`,
+          variant: "destructive",
+        });
+        return;
+      }
+      toast({
+        title: "Atenção: venda acima do saldo",
+        description: `Disponível: ${disponivel}. O saldo do produto ficará negativo.`,
+      });
     }
 
     const item: OrderItem = {
@@ -195,6 +252,29 @@ export function AddItemForm({ onAddItem }: AddItemFormProps) {
           )}
         </div>
       </div>
+
+      {stockInfo && (
+        <div className="space-y-2">
+          <div
+            className={`flex items-center gap-2 rounded-md px-3 py-2 text-sm ${
+              excedeSaldo ? "bg-destructive/10 text-destructive" : "bg-muted text-muted-foreground"
+            }`}
+          >
+            <Package className="h-4 w-4 flex-shrink-0" />
+            <span>
+              Saldo disponível: <strong>{disponivel}</strong>
+              {qtyInCart > 0 && ` (já no pedido: ${qtyInCart})`}
+              {excedeSaldo && (bloquearSemSaldo ? " — venda bloqueada acima do saldo" : " — quantidade acima do saldo")}
+            </span>
+          </div>
+          {stockInfo.pendente && (
+            <div className="flex items-center gap-2 rounded-md px-3 py-2 text-sm bg-amber-50 text-amber-800 border border-amber-200 dark:bg-amber-950/30 dark:text-amber-200 dark:border-amber-900">
+              <AlertTriangle className="h-4 w-4 flex-shrink-0" />
+              Produto pendente de identificação: confira o nome e o preço antes de vender.
+            </div>
+          )}
+        </div>
+      )}
 
       <div className="grid gap-4 sm:grid-cols-4">
         <div className="space-y-2">

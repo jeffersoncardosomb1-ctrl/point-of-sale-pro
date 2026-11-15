@@ -206,7 +206,7 @@ export function NewOrderForm({ onOrderCreated }: NewOrderFormProps) {
             </div>
           </div>
 
-          <AddItemForm onAddItem={handleAddItem} />
+          <AddItemForm onAddItem={handleAddItem} cartItems={items} />
 
           {items.length > 0 && (
             <div className="space-y-3">

@@ -97,7 +97,7 @@ export function PendingUsersManager() {
 
       if (roleError) throw roleError;
 
-      toast({ title: "Sucesso!", description: `Usuário aprovado como ${role === "admin" ? "administrador" : "vendedor"}` });
+      toast({ title: "Sucesso!", description: `Usuário aprovado como ${role === "admin" ? "administrador" : role === "manager" ? "gerente" : "vendedor"}` });
       fetchUsers();
     } catch (error) {
       console.error("Error approving user:", error);
@@ -220,7 +220,7 @@ export function PendingUsersManager() {
                 >
                   <div className="flex items-center gap-3">
                     <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10">
-                      {user.role === "admin" ? (
+                      {user.role === "admin" || user.role === "manager" ? (
                         <Shield className="h-4 w-4 text-primary" />
                       ) : (
                         <User className="h-4 w-4 text-muted-foreground" />
@@ -231,7 +231,7 @@ export function PendingUsersManager() {
                         {user.first_name} {user.last_name}
                       </span>
                       <Badge variant={user.role === "admin" ? "default" : "secondary"} className="ml-2">
-                        {user.role === "admin" ? "Admin" : "Vendedor"}
+                        {user.role === "admin" ? "Admin" : user.role === "manager" ? "Gerente" : "Vendedor"}
                       </Badge>
                     </div>
                   </div>
@@ -292,6 +292,7 @@ function PendingUserCard({
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="seller">Vendedor</SelectItem>
+            <SelectItem value="manager">Gerente</SelectItem>
             <SelectItem value="admin">Admin</SelectItem>
           </SelectContent>
         </Select>

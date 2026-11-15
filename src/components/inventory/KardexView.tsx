@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { History, Loader2, ArrowDown, ArrowUp } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { formatBRL } from "@/lib/sales-utils";
+import { MOVEMENT_LABELS } from "@/lib/stock-utils";
 
 interface MovementRow {
   id: string;
@@ -18,6 +19,8 @@ interface MovementRow {
   custo_unitario: number;
   custo_medio_apos: number;
   estoque_apos: number;
+  saldo_anterior: number;
+  usuario_nome: string;
   reference_type: string;
 }
 
@@ -35,7 +38,8 @@ export function KardexView() {
         .order("created_at", { ascending: false })
         .limit(1000);
       if (filter.trim()) {
-        q = q.ilike("barcode", `%${filter.trim()}%`);
+        const f = filter.trim().replace(/[,()]/g, " ");
+        q = q.or(`barcode.ilike.%${f}%,product_name.ilike.%${f}%`);
       }
       const { data, error } = await q;
       if (error) throw error;
@@ -61,7 +65,7 @@ export function KardexView() {
       <CardContent className="space-y-4">
         <div className="flex flex-wrap gap-2 items-end">
           <div className="flex-1 min-w-48 space-y-1">
-            <Label className="text-xs">Filtrar por código de barras</Label>
+            <Label className="text-xs">Filtrar por código ou nome</Label>
             <Input value={filter} onChange={(e) => setFilter(e.target.value)} placeholder="Digite o código..." />
           </div>
           <Button onClick={load} disabled={loading}>
@@ -81,7 +85,9 @@ export function KardexView() {
                 <th className="px-3 py-2 text-right">Qtd</th>
                 <th className="px-3 py-2 text-right">Custo unit.</th>
                 <th className="px-3 py-2 text-right">Custo médio após</th>
+                <th className="px-3 py-2 text-right">Saldo anterior</th>
                 <th className="px-3 py-2 text-right">Estoque após</th>
+                <th className="px-3 py-2">Usuário</th>
               </tr>
             </thead>
             <tbody>
@@ -91,28 +97,30 @@ export function KardexView() {
                     {new Date(r.created_at).toLocaleString("pt-BR")}
                   </td>
                   <td className="px-3 py-2">
-                    {r.movement_type === "ENTRADA" ? (
-                      <Badge variant="outline" className="gap-1 text-success border-success/30">
-                        <ArrowDown className="h-3 w-3" /> Entrada
+                    {Number(r.quantidade) >= 0 ? (
+                      <Badge variant="outline" className="gap-1 text-success border-success/30 whitespace-nowrap">
+                        <ArrowDown className="h-3 w-3" /> {MOVEMENT_LABELS[r.movement_type] || r.movement_type}
                       </Badge>
                     ) : (
-                      <Badge variant="outline" className="gap-1 text-destructive border-destructive/30">
-                        <ArrowUp className="h-3 w-3" /> Saída
+                      <Badge variant="outline" className="gap-1 text-destructive border-destructive/30 whitespace-nowrap">
+                        <ArrowUp className="h-3 w-3" /> {MOVEMENT_LABELS[r.movement_type] || r.movement_type}
                       </Badge>
                     )}
                   </td>
                   <td className="px-3 py-2 font-mono text-xs">{r.barcode}</td>
                   <td className="px-3 py-2">{r.product_name}</td>
-                  <td className="px-3 py-2 text-right">{Number(r.quantidade)}</td>
+                  <td className="px-3 py-2 text-right">{Number(r.quantidade) > 0 ? "+" : ""}{Number(r.quantidade)}</td>
                   <td className="px-3 py-2 text-right">{formatBRL(Number(r.custo_unitario))}</td>
                   <td className="px-3 py-2 text-right">{formatBRL(Number(r.custo_medio_apos))}</td>
+                  <td className="px-3 py-2 text-right text-muted-foreground">{Number(r.saldo_anterior)}</td>
                   <td className={`px-3 py-2 text-right font-medium ${Number(r.estoque_apos) < 0 ? "text-destructive" : ""}`}>
                     {Number(r.estoque_apos)}
                   </td>
+                  <td className="px-3 py-2 text-xs">{r.usuario_nome || "-"}</td>
                 </tr>
               ))}
               {rows.length === 0 && (
-                <tr><td colSpan={8} className="px-3 py-8 text-center text-muted-foreground">Sem movimentações.</td></tr>
+                <tr><td colSpan={10} className="px-3 py-8 text-center text-muted-foreground">Sem movimentações.</td></tr>
               )}
             </tbody>
           </table>

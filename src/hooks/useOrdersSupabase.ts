@@ -1,8 +1,10 @@
 import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { Tables } from "@/integrations/supabase/types";
 import { Order, OrderItem } from "@/types/order";
 import { PaymentMethod, SaleStatus } from "@/types/sales";
 import { toast } from "@/hooks/use-toast";
+import { dbErrorMessage } from "@/lib/stock-utils";
 
 function dbRowToOrder(row: any, items: OrderItem[]): Order {
   return {
@@ -136,32 +138,6 @@ export function useOrdersSupabase() {
 
         const pgto = orderData.pgtoValues || {};
 
-        // Insert order
-        const { data: orderRow, error: orderError } = await supabase
-          .from("orders")
-          .insert({
-            vendedor: orderData.vendedor,
-            forma_pagamento: orderData.formaPagamento,
-            status: "ATIVA",
-            total_bruto: totalBruto,
-            total_desconto: orderTotalDesconto,
-            total_liquido: orderTotalLiquido,
-            valor_pago: orderTotalLiquido,
-            troco: 0,
-            pgto_pix: pgto["PIX"] || 0,
-            pgto_cartao: pgto["CARTAO"] || 0,
-            pgto_dinheiro: pgto["DINHEIRO"] || 0,
-            pgto_boleto: pgto["BOLETO"] || 0,
-            pgto_outros: pgto["OUTROS"] || 0,
-            observacoes: orderData.observacoes || "",
-            client_id: orderData.clientId || null,
-            client_nome: orderData.clientNome || "",
-          })
-          .select()
-          .single();
-
-        if (orderError) throw orderError;
-
         // Prepare sales items, distributing manual discount proportionally
         const salesInserts = orderData.items.map((item) => {
           let itemDesconto = item.desconto;
@@ -175,8 +151,6 @@ export function useOrdersSupabase() {
           }
 
           return {
-            order_id: orderRow.id,
-            vendedor: orderData.vendedor,
             barcode: item.barcode,
             product_name: item.productName,
             quantidade: item.quantidade,
@@ -186,9 +160,20 @@ export function useOrdersSupabase() {
             desconto: itemDesconto,
             total_liquido: itemTotalLiquido,
             valor_pago: itemTotalLiquido,
-            troco: 0,
+          };
+        });
+
+        // Pedido + itens + baixa de estoque numa única transação (RPC create_order).
+        // A baixa (SAIDA_VENDA) e o custo da venda são gravados pelo trigger de vendas.
+        const { data, error: rpcError } = await supabase.rpc("create_order", {
+          _order: {
+            vendedor: orderData.vendedor,
             forma_pagamento: orderData.formaPagamento,
-            status: "ATIVA" as const,
+            total_bruto: totalBruto,
+            total_desconto: orderTotalDesconto,
+            total_liquido: orderTotalLiquido,
+            valor_pago: orderTotalLiquido,
+            troco: 0,
             pgto_pix: pgto["PIX"] || 0,
             pgto_cartao: pgto["CARTAO"] || 0,
             pgto_dinheiro: pgto["DINHEIRO"] || 0,
@@ -197,32 +182,15 @@ export function useOrdersSupabase() {
             observacoes: orderData.observacoes || "",
             client_id: orderData.clientId || null,
             client_nome: orderData.clientNome || "",
-          };
+          },
+          _items: salesInserts,
         });
 
-        const { data: salesData, error: salesError } = await supabase
-          .from("sales")
-          .insert(salesInserts)
-          .select();
+        if (rpcError) throw rpcError;
 
-        if (salesError) throw salesError;
-
-        // Register stock movements (SAIDA) for each sold item — uses cost_avg snapshot
-        // Non-blocking: if RPC fails (e.g. user not admin or product not registered) we keep the sale.
-        try {
-          await Promise.all(
-            (salesData || []).map((s: any) =>
-              supabase.rpc("register_sale_movement", {
-                _sale_id: s.id,
-                _barcode: s.barcode || "",
-                _product_name: s.product_name || "",
-                _quantidade: Number(s.quantidade) || 0,
-              })
-            )
-          );
-        } catch (mvErr) {
-          console.warn("Falha ao registrar movimentação de estoque:", mvErr);
-        }
+        const result = data as unknown as { order: Tables<"orders">; items: Tables<"sales">[] };
+        const orderRow = result.order;
+        const salesData = result.items;
 
         const newOrder = dbRowToOrder(
           orderRow,
@@ -239,9 +207,12 @@ export function useOrdersSupabase() {
         return newOrder;
       } catch (error) {
         console.error("Erro ao criar pedido:", error);
+        const message = (error as { message?: string })?.message || "";
         toast({
-          title: "Erro ao salvar pedido",
-          description: "Não foi possível salvar o pedido no banco de dados.",
+          title: message.startsWith("SALDO_INSUFICIENTE") ? "Saldo insuficiente" : "Erro ao salvar pedido",
+          description: message.startsWith("SALDO_INSUFICIENTE")
+            ? dbErrorMessage(error)
+            : "Não foi possível salvar o pedido no banco de dados.",
           variant: "destructive",
         });
         return null;
@@ -252,29 +223,9 @@ export function useOrdersSupabase() {
 
   const cancelOrder = useCallback(async (id: string, motivo: string): Promise<boolean> => {
     try {
-      // Update order status
-      const { error: orderError } = await supabase
-        .from("orders")
-        .update({
-          status: "CANCELADA",
-          cancel_motivo: motivo,
-          canceled_at: new Date().toISOString(),
-        })
-        .eq("id", id);
-
-      if (orderError) throw orderError;
-
-      // Update all sales items status
-      const { error: salesError } = await supabase
-        .from("sales")
-        .update({
-          status: "CANCELADA",
-          cancel_motivo: motivo,
-          canceled_at: new Date().toISOString(),
-        })
-        .eq("order_id", id);
-
-      if (salesError) throw salesError;
+      // Cancela o pedido e os itens; o trigger de vendas estorna o estoque (ESTORNO_VENDA)
+      const { error: cancelError } = await supabase.rpc("cancel_order", { _order_id: id, _motivo: motivo });
+      if (cancelError) throw cancelError;
 
       setOrders((prev) =>
         prev.map((o) =>
