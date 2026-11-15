@@ -94,7 +94,7 @@ export default function InventoryCountPage() {
 
   useEffect(() => {
     focusInput();
-  }, [focusInput, count?.status]);
+  }, [focusInput, count?.status, inv.isLoading]);
 
   // Contagem fechada: vai para a visualização somente leitura
   useEffect(() => {
@@ -133,7 +133,8 @@ export default function InventoryCountPage() {
 
   function handleSubmit(e: FormEvent) {
     e.preventDefault();
-    registerRead(code);
+    // Lê direto do campo: leitores USB/Bluetooth digitam e mandam Enter mais rápido que a renderização
+    registerRead(inputRef.current?.value ?? code);
     setCode("");
     inputRef.current?.focus();
   }
@@ -265,6 +266,7 @@ export default function InventoryCountPage() {
               <ScanBarcode className="absolute left-3 top-1/2 -translate-y-1/2 h-6 w-6 text-primary" />
               <Input
                 ref={inputRef}
+                autoFocus
                 value={code}
                 onChange={(e) => setCode(e.target.value)}
                 onBlur={handleBlur}
@@ -275,7 +277,7 @@ export default function InventoryCountPage() {
                 autoCapitalize="off"
                 spellCheck={false}
                 enterKeyHint="send"
-                className="h-14 pl-12 pr-12 text-xl font-mono"
+                className="h-14 pl-12 pr-12 text-xl font-mono placeholder:font-sans placeholder:text-base"
                 aria-label="Código de barras"
               />
               <Button
@@ -318,7 +320,7 @@ export default function InventoryCountPage() {
               >
                 <Plus className="h-6 w-6" />
               </Button>
-              <Button type="submit" className="h-14 flex-1 text-lg" disabled={!code.trim()}>
+              <Button type="submit" className="h-14 flex-1 text-lg">
                 Lançar
               </Button>
             </div>

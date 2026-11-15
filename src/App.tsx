@@ -11,6 +11,8 @@ import { ProtectedRoute } from "./components/auth/ProtectedRoute";
 import InventoryListPage from "./pages/InventoryListPage";
 import InventoryCountPage from "./pages/InventoryCountPage";
 import InventoryConferencePage from "./pages/InventoryConferencePage";
+import StockPage from "./pages/StockPage";
+import UnidentifiedProductsPage from "./pages/UnidentifiedProductsPage";
 
 const queryClient = new QueryClient();
 
@@ -35,6 +37,22 @@ const App = () => (
             element={
               <ProtectedRoute requiredRole="admin">
                 <AdminPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/estoque"
+            element={
+              <ProtectedRoute allowedRoles={["admin", "manager"]}>
+                <StockPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/estoque/a-identificar"
+            element={
+              <ProtectedRoute allowedRoles={["admin", "manager"]}>
+                <UnidentifiedProductsPage />
               </ProtectedRoute>
             }
           />
