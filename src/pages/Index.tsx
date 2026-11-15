@@ -26,7 +26,7 @@ const Index = () => {
   const [tab, setTab] = useState<Tab>("nova");
   const { sales, loading: salesLoading, cancelSale, updateSaleDate } = useSalesSupabase();
   const { createOrder, loading: ordersLoading } = useOrdersSupabase();
-  const { isAdmin, user } = useAuth();
+  const { isAdmin, canManageStock, user } = useAuth();
   const canViewGiroEstoque = isAdmin && user?.email === GIRO_ESTOQUE_ALLOWED_EMAIL;
 
   const STORE_NAME = "Fiorenzza Beauty";
@@ -76,6 +76,7 @@ const Index = () => {
             storeLogoSrc={STORE_LOGO_SRC}
             isAdmin={isAdmin}
             canViewGiroEstoque={canViewGiroEstoque}
+            canManageStock={canManageStock}
           />
 
           {loading ? (

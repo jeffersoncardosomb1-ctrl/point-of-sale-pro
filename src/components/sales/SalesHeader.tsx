@@ -1,5 +1,12 @@
-import { ShoppingCart, List, BarChart3, PackagePlus, TrendingUp, History, Tag, Users, PackageSearch, Repeat } from "lucide-react";
+import { ShoppingCart, List, BarChart3, PackagePlus, TrendingUp, History, Tag, Users, PackageSearch, Repeat, Boxes, ChevronDown, ClipboardList, CircleHelp } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 type Tab = "nova" | "lista" | "relatorios" | "compras" | "custos" | "kardex" | "preco" | "consulta" | "clientes" | "giro";
 
@@ -10,9 +17,11 @@ interface SalesHeaderProps {
   storeLogoSrc: string; // Adicionado prop para a URL da logo
   isAdmin?: boolean;
   canViewGiroEstoque?: boolean;
+  canManageStock?: boolean;
 }
 
-export function SalesHeader({ activeTab, onTabChange, storeName, storeLogoSrc, isAdmin, canViewGiroEstoque }: SalesHeaderProps) {
+export function SalesHeader({ activeTab, onTabChange, storeName, storeLogoSrc, isAdmin, canViewGiroEstoque, canManageStock }: SalesHeaderProps) {
+  const navigate = useNavigate();
   return (
     <header className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
       <div className="flex items-center gap-3">
@@ -68,6 +77,33 @@ export function SalesHeader({ activeTab, onTabChange, storeName, storeLogoSrc, i
           <Users className="h-4 w-4" />
           Clientes
         </Button>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="outline" className="gap-2">
+              <Boxes className="h-4 w-4" />
+              Estoque
+              <ChevronDown className="h-4 w-4" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="start">
+            {canManageStock && (
+              <DropdownMenuItem onClick={() => navigate("/estoque")}>
+                <Boxes className="mr-2 h-4 w-4" />
+                Estoque
+              </DropdownMenuItem>
+            )}
+            <DropdownMenuItem onClick={() => navigate("/estoque/inventario")}>
+              <ClipboardList className="mr-2 h-4 w-4" />
+              Inventário
+            </DropdownMenuItem>
+            {canManageStock && (
+              <DropdownMenuItem onClick={() => navigate("/estoque/a-identificar")}>
+                <CircleHelp className="mr-2 h-4 w-4" />
+                Produtos a identificar
+              </DropdownMenuItem>
+            )}
+          </DropdownMenuContent>
+        </DropdownMenu>
         {isAdmin && (
           <>
             <Button

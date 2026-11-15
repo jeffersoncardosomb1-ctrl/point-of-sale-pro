@@ -8,9 +8,10 @@ import { Button } from "@/components/ui/button";
 interface ProtectedRouteProps {
   children: ReactNode;
   requiredRole?: AppRole;
+  allowedRoles?: AppRole[];
 }
 
-export function ProtectedRoute({ children, requiredRole }: ProtectedRouteProps) {
+export function ProtectedRoute({ children, requiredRole, allowedRoles }: ProtectedRouteProps) {
   const { user, isLoading, role, isApproved, signOut } = useAuth();
 
   if (isLoading) {
@@ -57,6 +58,9 @@ export function ProtectedRoute({ children, requiredRole }: ProtectedRouteProps) 
 
   // Check role requirement
   if (requiredRole && role !== requiredRole) {
+    return <Navigate to="/" replace />;
+  }
+  if (allowedRoles && (!role || !allowedRoles.includes(role))) {
     return <Navigate to="/" replace />;
   }
 

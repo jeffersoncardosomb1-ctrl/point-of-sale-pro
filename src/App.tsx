@@ -8,6 +8,8 @@ import NotFound from "./pages/NotFound";
 import AdminPage from "./pages/AdminPage";
 import AuthPage from "./pages/AuthPage";
 import { ProtectedRoute } from "./components/auth/ProtectedRoute";
+import InventoryListPage from "./pages/InventoryListPage";
+import InventoryCountPage from "./pages/InventoryCountPage";
 
 const queryClient = new QueryClient();
 
@@ -32,6 +34,22 @@ const App = () => (
             element={
               <ProtectedRoute requiredRole="admin">
                 <AdminPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/estoque/inventario"
+            element={
+              <ProtectedRoute>
+                <InventoryListPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/estoque/inventario/:id"
+            element={
+              <ProtectedRoute>
+                <InventoryCountPage />
               </ProtectedRoute>
             }
           />

@@ -27,7 +27,7 @@ export function UserMenu() {
   };
 
   const userInitials = user?.email?.slice(0, 2).toUpperCase() || "U";
-  const roleLabel = role === "admin" ? "Administrador" : "Vendedor";
+  const roleLabel = role === "admin" ? "Administrador" : role === "manager" ? "Gerente" : "Vendedor";
 
   return (
     <DropdownMenu>

@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { User, Session } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 
-export type AppRole = "admin" | "seller";
+export type AppRole = "admin" | "seller" | "manager";
 
 interface AuthState {
   user: User | null;
@@ -10,6 +10,8 @@ interface AuthState {
   role: AppRole | null;
   isLoading: boolean;
   isAdmin: boolean;
+  /** Administrador ou gerente: finaliza inventário, mescla produtos, vê custos. */
+  canManageStock: boolean;
   isApproved: boolean;
   firstName: string | null;
   lastName: string | null;
@@ -22,6 +24,7 @@ export function useAuth() {
     role: null,
     isLoading: true,
     isAdmin: false,
+    canManageStock: false,
     isApproved: false,
     firstName: null,
     lastName: null,
@@ -47,6 +50,7 @@ export function useAuth() {
             ...prev,
             role: null,
             isAdmin: false,
+            canManageStock: false,
             isApproved: false,
             firstName: null,
             lastName: null,
@@ -109,6 +113,7 @@ export function useAuth() {
         ...prev,
         role,
         isAdmin: role === "admin",
+        canManageStock: role === "admin" || role === "manager",
         isApproved,
         firstName,
         lastName,
