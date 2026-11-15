@@ -10,6 +10,7 @@ import AuthPage from "./pages/AuthPage";
 import { ProtectedRoute } from "./components/auth/ProtectedRoute";
 import InventoryListPage from "./pages/InventoryListPage";
 import InventoryCountPage from "./pages/InventoryCountPage";
+import InventoryConferencePage from "./pages/InventoryConferencePage";
 
 const queryClient = new QueryClient();
 
@@ -50,6 +51,14 @@ const App = () => (
             element={
               <ProtectedRoute>
                 <InventoryCountPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/estoque/inventario/:id/conferencia"
+            element={
+              <ProtectedRoute>
+                <InventoryConferencePage />
               </ProtectedRoute>
             }
           />
