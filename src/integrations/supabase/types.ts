@@ -121,33 +121,74 @@ export type Database = {
           },
         ]
       }
-      products: {
+      product_barcodes: {
         Row: {
           barcode: string
-          cost_avg: number
-          created_at: string | null
+          created_at: string
+          created_by: string | null
           id: string
-          price: number
-          product_name: string
-          stock: number
+          product_id: string
         }
         Insert: {
           barcode: string
-          cost_avg?: number
-          created_at?: string | null
+          created_at?: string
+          created_by?: string | null
           id?: string
-          price?: number
-          product_name: string
-          stock?: number
+          product_id: string
         }
         Update: {
           barcode?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          product_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "product_barcodes_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      products: {
+        Row: {
+          barcode: string
+          category: string
+          cost_avg: number
+          created_at: string | null
+          id: string
+          pendente_identificacao: boolean
+          price: number
+          product_name: string
+          stock: number
+          updated_at: string
+        }
+        Insert: {
+          barcode: string
+          category?: string
           cost_avg?: number
           created_at?: string | null
           id?: string
+          pendente_identificacao?: boolean
+          price?: number
+          product_name: string
+          stock?: number
+          updated_at?: string
+        }
+        Update: {
+          barcode?: string
+          category?: string
+          cost_avg?: number
+          created_at?: string | null
+          id?: string
+          pendente_identificacao?: boolean
           price?: number
           product_name?: string
           stock?: number
+          updated_at?: string
         }
         Relationships: []
       }
@@ -379,44 +420,91 @@ export type Database = {
         Row: {
           barcode: string
           created_at: string
+          custo_medio_anterior: number
           custo_medio_apos: number
           custo_unitario: number
+          device_info: string
           estoque_apos: number
           id: string
           movement_type: string
           observacoes: string
+          product_id: string | null
           product_name: string
           quantidade: number
           reference_id: string | null
           reference_type: string
+          saldo_anterior: number
+          usuario_id: string | null
+          usuario_nome: string
         }
         Insert: {
           barcode: string
           created_at?: string
+          custo_medio_anterior?: number
           custo_medio_apos?: number
           custo_unitario?: number
+          device_info?: string
           estoque_apos?: number
           id?: string
           movement_type: string
           observacoes?: string
+          product_id?: string | null
           product_name?: string
           quantidade: number
           reference_id?: string | null
           reference_type?: string
+          saldo_anterior?: number
+          usuario_id?: string | null
+          usuario_nome?: string
         }
         Update: {
           barcode?: string
           created_at?: string
+          custo_medio_anterior?: number
           custo_medio_apos?: number
           custo_unitario?: number
+          device_info?: string
           estoque_apos?: number
           id?: string
           movement_type?: string
           observacoes?: string
+          product_id?: string | null
           product_name?: string
           quantidade?: number
           reference_id?: string | null
           reference_type?: string
+          saldo_anterior?: number
+          usuario_id?: string | null
+          usuario_nome?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "stock_movements_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      stock_settings: {
+        Row: {
+          bloquear_venda_sem_saldo: boolean
+          id: number
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          bloquear_venda_sem_saldo?: boolean
+          id?: number
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          bloquear_venda_sem_saldo?: boolean
+          id?: number
+          updated_at?: string
+          updated_by?: string | null
         }
         Relationships: []
       }
@@ -446,10 +534,58 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      _apply_stock_movement: {
+        Args: {
+          _custo_unit?: number
+          _device?: string
+          _obs?: string
+          _product_id: string
+          _qtd: number
+          _ref_id?: string
+          _ref_type?: string
+          _tipo: string
+        }
+        Returns: {
+          barcode: string
+          created_at: string
+          custo_medio_anterior: number
+          custo_medio_apos: number
+          custo_unitario: number
+          device_info: string
+          estoque_apos: number
+          id: string
+          movement_type: string
+          observacoes: string
+          product_id: string | null
+          product_name: string
+          quantidade: number
+          reference_id: string | null
+          reference_type: string
+          saldo_anterior: number
+          usuario_id: string | null
+          usuario_nome: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "stock_movements"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      _create_stock_product: {
+        Args: {
+          _barcode: string
+          _name: string
+          _pendente?: boolean
+          _price?: number
+        }
+        Returns: string
+      }
       apply_purchase_entry: {
         Args: { _file_name: string; _items: Json; _vendedor: string }
         Returns: string
       }
+      current_user_display_name: { Args: never; Returns: string }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
@@ -457,7 +593,9 @@ export type Database = {
         }
         Returns: boolean
       }
+      is_active_user: { Args: { _user_id: string }; Returns: boolean }
       is_admin: { Args: { _user_id: string }; Returns: boolean }
+      is_manager_or_admin: { Args: { _user_id: string }; Returns: boolean }
       register_sale_movement: {
         Args: {
           _barcode: string
@@ -467,6 +605,7 @@ export type Database = {
         }
         Returns: undefined
       }
+      resolve_product: { Args: { _barcode: string }; Returns: string }
     }
     Enums: {
       app_role: "admin" | "seller" | "manager"
