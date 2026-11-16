@@ -10,7 +10,7 @@ export type Database = {
   // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
-    PostgrestVersion: "14.5"
+    PostgrestVersion: "13.0.5"
   }
   public: {
     Tables: {
@@ -38,181 +38,6 @@ export type Database = {
           nome?: string
           telefone?: string
           updated_at?: string
-        }
-        Relationships: []
-      }
-      inventory_count_entries: {
-        Row: {
-          barcode: string
-          client_created_at: string | null
-          count_id: string
-          created_at: string
-          device_id: string
-          device_label: string
-          id: string
-          product_id: string | null
-          quantidade: number
-          tipo: string
-          user_id: string | null
-          user_nome: string
-        }
-        Insert: {
-          barcode: string
-          client_created_at?: string | null
-          count_id: string
-          created_at?: string
-          device_id?: string
-          device_label?: string
-          id: string
-          product_id?: string | null
-          quantidade: number
-          tipo?: string
-          user_id?: string | null
-          user_nome?: string
-        }
-        Update: {
-          barcode?: string
-          client_created_at?: string | null
-          count_id?: string
-          created_at?: string
-          device_id?: string
-          device_label?: string
-          id?: string
-          product_id?: string | null
-          quantidade?: number
-          tipo?: string
-          user_id?: string | null
-          user_nome?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "inventory_count_entries_count_id_fkey"
-            columns: ["count_id"]
-            isOneToOne: false
-            referencedRelation: "inventory_counts"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      inventory_count_items: {
-        Row: {
-          a_identificar: boolean
-          barcode: string
-          contado: boolean
-          count_id: string
-          created_at: string
-          custo_medio: number
-          diferenca: number
-          id: string
-          movement_id: string | null
-          product_id: string | null
-          product_name: string
-          quantidade_contada: number
-          saldo_sistema_no_fechamento: number
-          valor_diferenca: number
-        }
-        Insert: {
-          a_identificar?: boolean
-          barcode: string
-          contado?: boolean
-          count_id: string
-          created_at?: string
-          custo_medio?: number
-          diferenca?: number
-          id?: string
-          movement_id?: string | null
-          product_id?: string | null
-          product_name?: string
-          quantidade_contada?: number
-          saldo_sistema_no_fechamento?: number
-          valor_diferenca?: number
-        }
-        Update: {
-          a_identificar?: boolean
-          barcode?: string
-          contado?: boolean
-          count_id?: string
-          created_at?: string
-          custo_medio?: number
-          diferenca?: number
-          id?: string
-          movement_id?: string | null
-          product_id?: string | null
-          product_name?: string
-          quantidade_contada?: number
-          saldo_sistema_no_fechamento?: number
-          valor_diferenca?: number
-        }
-        Relationships: [
-          {
-            foreignKeyName: "inventory_count_items_count_id_fkey"
-            columns: ["count_id"]
-            isOneToOne: false
-            referencedRelation: "inventory_counts"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      inventory_counts: {
-        Row: {
-          canceled_at: string | null
-          canceled_by: string | null
-          created_at: string
-          created_by: string | null
-          created_by_nome: string
-          finalized_at: string | null
-          finalized_by: string | null
-          finalized_by_nome: string
-          id: string
-          numero: number
-          observacoes: string
-          status: Database["public"]["Enums"]["inventory_status"]
-          tipo: Database["public"]["Enums"]["inventory_type"] | null
-          total_divergencias: number | null
-          total_itens: number | null
-          valor_antes: number | null
-          valor_depois: number | null
-          valor_divergencia: number | null
-        }
-        Insert: {
-          canceled_at?: string | null
-          canceled_by?: string | null
-          created_at?: string
-          created_by?: string | null
-          created_by_nome?: string
-          finalized_at?: string | null
-          finalized_by?: string | null
-          finalized_by_nome?: string
-          id?: string
-          numero?: number
-          observacoes?: string
-          status?: Database["public"]["Enums"]["inventory_status"]
-          tipo?: Database["public"]["Enums"]["inventory_type"] | null
-          total_divergencias?: number | null
-          total_itens?: number | null
-          valor_antes?: number | null
-          valor_depois?: number | null
-          valor_divergencia?: number | null
-        }
-        Update: {
-          canceled_at?: string | null
-          canceled_by?: string | null
-          created_at?: string
-          created_by?: string | null
-          created_by_nome?: string
-          finalized_at?: string | null
-          finalized_by?: string | null
-          finalized_by_nome?: string
-          id?: string
-          numero?: number
-          observacoes?: string
-          status?: Database["public"]["Enums"]["inventory_status"]
-          tipo?: Database["public"]["Enums"]["inventory_type"] | null
-          total_divergencias?: number | null
-          total_itens?: number | null
-          valor_antes?: number | null
-          valor_depois?: number | null
-          valor_divergencia?: number | null
         }
         Relationships: []
       }
@@ -298,9 +123,6 @@ export type Database = {
       }
       products: {
         Row: {
-          category: string
-          pendente_identificacao: boolean
-          updated_at: string
           barcode: string
           cost_avg: number
           created_at: string | null
@@ -310,9 +132,6 @@ export type Database = {
           stock: number
         }
         Insert: {
-          category?: string
-          pendente_identificacao?: boolean
-          updated_at?: string
           barcode: string
           cost_avg?: number
           created_at?: string | null
@@ -322,9 +141,6 @@ export type Database = {
           stock?: number
         }
         Update: {
-          category?: string
-          pendente_identificacao?: boolean
-          updated_at?: string
           barcode?: string
           cost_avg?: number
           created_at?: string | null
@@ -332,30 +148,6 @@ export type Database = {
           price?: number
           product_name?: string
           stock?: number
-        }
-        Relationships: []
-      }
-      product_barcodes: {
-        Row: {
-          barcode: string
-          created_at: string
-          created_by: string | null
-          id: string
-          product_id: string
-        }
-        Insert: {
-          barcode: string
-          created_at?: string
-          created_by?: string | null
-          id?: string
-          product_id: string
-        }
-        Update: {
-          barcode?: string
-          created_at?: string
-          created_by?: string | null
-          id?: string
-          product_id?: string
         }
         Relationships: []
       }
@@ -394,9 +186,6 @@ export type Database = {
       }
       purchase_entries: {
         Row: {
-          status: string
-          estornada_at: string | null
-          estornada_by: string | null
           created_at: string
           file_name: string
           id: string
@@ -408,9 +197,6 @@ export type Database = {
           vendedor: string
         }
         Insert: {
-          status?: string
-          estornada_at?: string | null
-          estornada_by?: string | null
           created_at?: string
           file_name?: string
           id?: string
@@ -422,9 +208,6 @@ export type Database = {
           vendedor?: string
         }
         Update: {
-          status?: string
-          estornada_at?: string | null
-          estornada_by?: string | null
           created_at?: string
           file_name?: string
           id?: string
@@ -439,7 +222,6 @@ export type Database = {
       }
       purchase_items: {
         Row: {
-          product_id: string | null
           barcode: string
           created_at: string
           custo_medio_apos: number
@@ -452,7 +234,6 @@ export type Database = {
           valor_venda: number
         }
         Insert: {
-          product_id?: string | null
           barcode: string
           created_at?: string
           custo_medio_apos?: number
@@ -465,7 +246,6 @@ export type Database = {
           valor_venda?: number
         }
         Update: {
-          product_id?: string | null
           barcode?: string
           created_at?: string
           custo_medio_apos?: number
@@ -597,12 +377,6 @@ export type Database = {
       }
       stock_movements: {
         Row: {
-          product_id: string | null
-          saldo_anterior: number
-          custo_medio_anterior: number
-          usuario_id: string | null
-          usuario_nome: string
-          device_info: string
           barcode: string
           created_at: string
           custo_medio_apos: number
@@ -617,12 +391,6 @@ export type Database = {
           reference_type: string
         }
         Insert: {
-          product_id?: string | null
-          saldo_anterior?: number
-          custo_medio_anterior?: number
-          usuario_id?: string | null
-          usuario_nome?: string
-          device_info?: string
           barcode: string
           created_at?: string
           custo_medio_apos?: number
@@ -637,12 +405,6 @@ export type Database = {
           reference_type?: string
         }
         Update: {
-          product_id?: string | null
-          saldo_anterior?: number
-          custo_medio_anterior?: number
-          usuario_id?: string | null
-          usuario_nome?: string
-          device_info?: string
           barcode?: string
           created_at?: string
           custo_medio_apos?: number
@@ -655,27 +417,6 @@ export type Database = {
           quantidade?: number
           reference_id?: string | null
           reference_type?: string
-        }
-        Relationships: []
-      }
-      stock_settings: {
-        Row: {
-          bloquear_venda_sem_saldo: boolean
-          id: number
-          updated_at: string
-          updated_by: string | null
-        }
-        Insert: {
-          bloquear_venda_sem_saldo?: boolean
-          id?: number
-          updated_at?: string
-          updated_by?: string | null
-        }
-        Update: {
-          bloquear_venda_sem_saldo?: boolean
-          id?: number
-          updated_at?: string
-          updated_by?: string | null
         }
         Relationships: []
       }
@@ -702,134 +443,12 @@ export type Database = {
       }
     }
     Views: {
-      inventory_counts_summary: {
-        Row: {
-          canceled_at: string | null
-          canceled_by: string | null
-          created_at: string | null
-          created_by: string | null
-          created_by_nome: string | null
-          finalized_at: string | null
-          finalized_by: string | null
-          finalized_by_nome: string | null
-          id: string | null
-          itens_contados: number | null
-          lancamentos: number | null
-          numero: number | null
-          observacoes: string | null
-          status: Database["public"]["Enums"]["inventory_status"] | null
-          tipo: Database["public"]["Enums"]["inventory_type"] | null
-          total_divergencias: number | null
-          total_itens: number | null
-          valor_antes: number | null
-          valor_depois: number | null
-          valor_divergencia: number | null
-        }
-        Relationships: []
-      }
+      [_ in never]: never
     }
     Functions: {
-      apply_initial_avg_cost: {
-        Args: { _product_ids: string[] }
-        Returns: number
-      }
       apply_purchase_entry: {
         Args: { _file_name: string; _items: Json; _vendedor: string }
         Returns: string
-      }
-      cancel_inventory: { Args: { _count_id: string }; Returns: undefined }
-      cancel_order: {
-        Args: { _motivo: string; _order_id: string }
-        Returns: undefined
-      }
-      create_inventory_count: {
-        Args: { _observacoes?: string }
-        Returns: string
-      }
-      create_order: { Args: { _items: Json; _order: Json }; Returns: Json }
-      current_user_display_name: { Args: never; Returns: string }
-      finalize_inventory: {
-        Args: {
-          _count_id: string
-          _tipo: Database["public"]["Enums"]["inventory_type"]
-        }
-        Returns: Json
-      }
-      get_inventory_conference: {
-        Args: {
-          _count_id: string
-          _tipo?: Database["public"]["Enums"]["inventory_type"]
-        }
-        Returns: {
-          a_identificar: boolean
-          ajusta: boolean
-          barcode: string
-          category: string
-          contado: boolean
-          custo_medio: number
-          diferenca: number
-          leituras: number
-          pendente_identificacao: boolean
-          product_id: string | null
-          product_name: string
-          quantidade_contada: number
-          saldo_sistema: number
-          ultimo_lancamento: string | null
-          valor_diferenca: number
-        }[]
-      }
-      identify_product: {
-        Args: {
-          _category: string
-          _cost: number
-          _price: number
-          _product_id: string
-          _product_name: string
-        }
-        Returns: undefined
-      }
-      is_active_user: { Args: { _user_id: string }; Returns: boolean }
-      is_manager_or_admin: { Args: { _user_id: string }; Returns: boolean }
-      merge_products: {
-        Args: { _source_id: string; _target_id: string }
-        Returns: undefined
-      }
-      preview_initial_avg_cost: {
-        Args: never
-        Returns: {
-          barcode: string
-          custo_atual: number
-          custo_calculado: number
-          diferenca: number
-          media_simples: number
-          product_id: string
-          product_name: string
-          qtd_comprada: number
-          qtd_entradas: number
-          saldo_atual: number
-        }[]
-      }
-      register_count_entry: {
-        Args: {
-          _barcode: string
-          _client_created_at?: string
-          _count_id: string
-          _device_id?: string
-          _device_label?: string
-          _id: string
-          _quantidade: number
-          _tipo?: string
-        }
-        Returns: undefined
-      }
-      resolve_product: { Args: { _barcode: string }; Returns: string }
-      reverse_purchase_entry: { Args: { _entry_id: string }; Returns: undefined }
-      set_inventory_status: {
-        Args: {
-          _count_id: string
-          _status: Database["public"]["Enums"]["inventory_status"]
-        }
-        Returns: undefined
       }
       has_role: {
         Args: {
@@ -850,9 +469,7 @@ export type Database = {
       }
     }
     Enums: {
-      app_role: "admin" | "seller" | "manager"
-      inventory_status: "ABERTA" | "EM_CONFERENCIA" | "FINALIZADA" | "CANCELADA"
-      inventory_type: "TOTAL" | "PARCIAL"
+      app_role: "admin" | "seller"
       payment_method: "PIX" | "CARTAO" | "DINHEIRO" | "BOLETO" | "OUTROS"
       sale_status: "ATIVA" | "CANCELADA"
     }
@@ -982,9 +599,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
-      app_role: ["admin", "seller", "manager"],
-      inventory_status: ["ABERTA", "EM_CONFERENCIA", "FINALIZADA", "CANCELADA"],
-      inventory_type: ["TOTAL", "PARCIAL"],
+      app_role: ["admin", "seller"],
       payment_method: ["PIX", "CARTAO", "DINHEIRO", "BOLETO", "OUTROS"],
       sale_status: ["ATIVA", "CANCELADA"],
     },
