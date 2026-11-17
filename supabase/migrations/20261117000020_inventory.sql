@@ -84,6 +84,11 @@ CREATE POLICY "Active users read inventory_count_entries" ON public.inventory_co
 CREATE POLICY "Active users read inventory_count_items" ON public.inventory_count_items
   FOR SELECT TO authenticated USING (public.is_active_user(auth.uid()));
 
+-- Permissões explícitas (o projeto não concede acesso automático a tabelas novas)
+GRANT SELECT ON public.inventory_counts, public.inventory_count_entries, public.inventory_count_items TO authenticated;
+GRANT ALL ON public.inventory_counts, public.inventory_count_entries, public.inventory_count_items TO service_role;
+GRANT USAGE, SELECT ON SEQUENCE public.inventory_counts_numero_seq TO service_role;
+
 ALTER PUBLICATION supabase_realtime ADD TABLE public.inventory_count_entries;
 ALTER PUBLICATION supabase_realtime ADD TABLE public.inventory_counts;
 
@@ -410,6 +415,9 @@ LEFT JOIN (
   FROM public.inventory_count_entries
   GROUP BY count_id
 ) s ON s.count_id = c.id;
+
+GRANT SELECT ON public.inventory_counts_summary TO authenticated;
+GRANT ALL ON public.inventory_counts_summary TO service_role;
 
 -- Contagem finalizada/cancelada é somente leitura (inclusive para funções)
 CREATE OR REPLACE FUNCTION public.protect_closed_inventory()

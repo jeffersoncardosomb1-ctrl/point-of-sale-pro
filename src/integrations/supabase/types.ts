@@ -750,6 +750,53 @@ export type Database = {
       }
     }
     Functions: {
+      _apply_stock_movement: {
+        Args: {
+          _custo_unit?: number
+          _device?: string
+          _obs?: string
+          _product_id: string
+          _qtd: number
+          _ref_id?: string
+          _ref_type?: string
+          _tipo: string
+        }
+        Returns: {
+          barcode: string
+          created_at: string
+          custo_medio_anterior: number
+          custo_medio_apos: number
+          custo_unitario: number
+          device_info: string
+          estoque_apos: number
+          id: string
+          movement_type: string
+          observacoes: string
+          product_id: string | null
+          product_name: string
+          quantidade: number
+          reference_id: string | null
+          reference_type: string
+          saldo_anterior: number
+          usuario_id: string | null
+          usuario_nome: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "stock_movements"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      _create_stock_product: {
+        Args: {
+          _barcode: string
+          _name: string
+          _pendente?: boolean
+          _price?: number
+        }
+        Returns: string
+      }
       apply_initial_avg_cost: {
         Args: { _product_ids: string[] }
         Returns: number

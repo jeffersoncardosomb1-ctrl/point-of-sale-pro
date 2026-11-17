@@ -92,6 +92,8 @@ CREATE TABLE IF NOT EXISTS public.product_barcodes (
   created_at timestamptz NOT NULL DEFAULT now(),
   created_by uuid
 );
+GRANT SELECT ON public.product_barcodes TO authenticated;
+GRANT ALL ON public.product_barcodes TO service_role;
 CREATE INDEX IF NOT EXISTS idx_product_barcodes_product ON public.product_barcodes (product_id);
 
 ALTER TABLE public.product_barcodes ENABLE ROW LEVEL SECURITY;
@@ -238,6 +240,8 @@ CREATE TABLE IF NOT EXISTS public.stock_settings (
   updated_at timestamptz NOT NULL DEFAULT now(),
   updated_by uuid
 );
+GRANT SELECT ON public.stock_settings TO authenticated;
+GRANT ALL ON public.stock_settings TO service_role;
 INSERT INTO public.stock_settings (id) VALUES (1) ON CONFLICT DO NOTHING;
 
 ALTER TABLE public.stock_settings ENABLE ROW LEVEL SECURITY;
