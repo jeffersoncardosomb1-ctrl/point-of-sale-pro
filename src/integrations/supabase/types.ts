@@ -96,6 +96,13 @@ export type Database = {
       }
       inventory_count_items: {
         Row: {
+          status: string
+          rodada_inicio: string | null
+          movimentos_durante: number
+          saved_at: string | null
+          saved_by: string | null
+          saved_by_nome: string
+          updated_at: string
           a_identificar: boolean
           barcode: string
           contado: boolean
@@ -112,6 +119,13 @@ export type Database = {
           valor_diferenca: number
         }
         Insert: {
+          status?: string
+          rodada_inicio?: string | null
+          movimentos_durante?: number
+          saved_at?: string | null
+          saved_by?: string | null
+          saved_by_nome?: string
+          updated_at?: string
           a_identificar?: boolean
           barcode: string
           contado?: boolean
@@ -128,6 +142,13 @@ export type Database = {
           valor_diferenca?: number
         }
         Update: {
+          status?: string
+          rodada_inicio?: string | null
+          movimentos_durante?: number
+          saved_at?: string | null
+          saved_by?: string | null
+          saved_by_nome?: string
+          updated_at?: string
           a_identificar?: boolean
           barcode?: string
           contado?: boolean
@@ -765,15 +786,21 @@ export type Database = {
           ajusta: boolean
           barcode: string
           category: string
-          contado: boolean
+          contando: boolean
           custo_medio: number
           diferenca: number
           leituras: number
+          movimentos_durante: number
           pendente_identificacao: boolean
           product_id: string | null
           product_name: string
           quantidade_contada: number
+          quantidade_salva: number | null
           saldo_sistema: number
+          salvo: boolean
+          saved_at: string | null
+          saved_by_nome: string | null
+          situacao: string
           ultimo_lancamento: string | null
           valor_diferenca: number
         }[]
@@ -824,6 +851,10 @@ export type Database = {
       }
       resolve_product: { Args: { _barcode: string }; Returns: string }
       reverse_purchase_entry: { Args: { _entry_id: string }; Returns: undefined }
+      save_count_item: {
+        Args: { _barcode: string; _count_id: string }
+        Returns: Json
+      }
       set_inventory_status: {
         Args: {
           _count_id: string

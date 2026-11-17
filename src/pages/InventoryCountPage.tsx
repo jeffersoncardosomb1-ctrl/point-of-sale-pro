@@ -13,6 +13,7 @@ import {
   Minus,
   Pencil,
   Plus,
+  Save,
   RefreshCw,
   ScanBarcode,
   Search,
@@ -43,7 +44,7 @@ import {
 import { StockLayout } from "@/components/stock/StockLayout";
 import { CameraScanner } from "@/components/stock/CameraScanner";
 import { InventoryStatusBadge } from "@/components/stock/InventoryStatusBadge";
-import { CountedItem, useInventoryCount } from "@/hooks/useInventoryCount";
+import { CountedItem, SaveResult, useInventoryCount } from "@/hooks/useInventoryCount";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { beep } from "@/lib/device";
@@ -170,14 +171,42 @@ export default function InventoryCountPage() {
     onError: (err) => toast({ title: "Erro", description: dbErrorMessage(err), variant: "destructive" }),
   });
 
+  const save = useMutation({
+    mutationFn: (item: CountedItem) => inv.saveItem(item),
+    onSuccess: (r: SaveResult) => {
+      beep("ok");
+      const durante =
+        r.movimentos_durante !== 0
+          ? ` (${formatQty(Math.abs(r.movimentos_durante))} ${
+              Math.abs(r.movimentos_durante) === 1
+                ? r.movimentos_durante < 0 ? "saiu" : "entrou"
+                : r.movimentos_durante < 0 ? "saíram" : "entraram"
+            } durante a contagem)`
+          : "";
+      toast({
+        title: `Salvo: ${r.product_name}`,
+        description: `Contado ${formatQty(r.contado)}${durante}. Saldo atualizado: ${formatQty(r.saldo_anterior)} → ${formatQty(r.saldo_novo)}.`,
+      });
+      window.setTimeout(() => inputRef.current?.focus(), 50);
+    },
+    onError: (err) => {
+      beep("warn");
+      toast({ title: "Não foi possível salvar", description: dbErrorMessage(err), variant: "destructive" });
+    },
+  });
+
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
     if (!q) return items;
     return items.filter((i) => i.name.toLowerCase().includes(q) || i.barcode.includes(q));
   }, [items, search]);
 
-  const totalUnits = items.reduce((s, i) => s + i.total, 0);
-  const unknownCount = items.filter((i) => i.unknown).length;
+  const countingItems = filtered.filter((i) => i.counting);
+  const savedItems = filtered.filter((i) => !i.counting && i.saved);
+  const countingTotal = items.filter((i) => i.counting).length;
+  const savedTotal = items.filter((i) => i.saved).length;
+  const unknownCount = items.filter((i) => i.unknown && i.counting).length;
+  const canSaveLast = !!lastItem?.counting && !save.isPending;
 
   if (inv.isLoading) {
     return (
@@ -215,15 +244,33 @@ export default function InventoryCountPage() {
           <div className="font-mono text-xs text-muted-foreground">{last.barcode}</div>
           {last.unknown && (
             <div className="text-xs text-amber-700 dark:text-amber-300 mt-1">
-              Código não cadastrado: será criado como "A IDENTIFICAR" ao finalizar.
+              Código não cadastrado: será criado como "A IDENTIFICAR" ao salvar.
             </div>
           )}
         </div>
         <div className="text-right">
-          <div className="text-xs text-muted-foreground">Contado</div>
-          <div className="text-3xl font-bold tabular-nums">{formatQty(lastItem?.total ?? last.added)}</div>
+          <div className="text-xs text-muted-foreground">{lastItem && !lastItem.counting ? "Salvo" : "Contando"}</div>
+          <div className="text-3xl font-bold tabular-nums">
+            {formatQty(lastItem ? (lastItem.counting ? lastItem.total : lastItem.saved?.quantidade) : last.added)}
+          </div>
         </div>
       </div>
+      {lastItem?.counting ? (
+        <Button
+          type="button"
+          className="mt-3 w-full h-14 text-lg gap-2"
+          onClick={() => lastItem && save.mutate(lastItem)}
+          disabled={!canSaveLast}
+        >
+          {save.isPending ? <Loader2 className="h-5 w-5 animate-spin" /> : <Save className="h-5 w-5" />}
+          Salvar contagem deste produto
+        </Button>
+      ) : lastItem?.saved ? (
+        <div className="mt-2 flex items-center gap-2 text-sm text-success">
+          <CheckCircle2 className="h-4 w-4" />
+          Salvo — saldo já atualizado no estoque. Leia de novo para recontar.
+        </div>
+      ) : null}
     </div>
   );
 
@@ -253,7 +300,7 @@ export default function InventoryCountPage() {
           </Button>
         )}
         <span className="ml-auto text-muted-foreground">
-          {items.length} itens · {formatQty(totalUnits)} un
+          {countingTotal} contando · {savedTotal} salvos
           {unknownCount > 0 && <span className="text-amber-600"> · {unknownCount} a identificar</span>}
         </span>
       </div>
@@ -357,43 +404,85 @@ export default function InventoryCountPage() {
             {items.length === 0 ? "Nenhum item contado ainda. Comece lendo um código." : "Nenhum item encontrado."}
           </p>
         ) : (
-          <ul className="divide-y rounded-lg border bg-card">
-            {filtered.map((i) => (
-              <li key={i.key} className="flex items-center gap-2 p-3">
-                <div className="min-w-0 flex-1">
-                  <div className={cn("font-medium leading-tight break-words", i.unknown && "text-amber-700 dark:text-amber-300")}>
-                    {i.name}
-                  </div>
-                  <div className="text-xs text-muted-foreground">
-                    <span className="font-mono">{i.barcode}</span> · {i.leituras} lanç. · {i.lastUser}
-                    {i.pending > 0 && <span className="text-amber-600"> · aguardando envio</span>}
-                  </div>
-                </div>
-                <div className="text-2xl font-bold tabular-nums w-16 text-right">{formatQty(i.total)}</div>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-11 w-11"
-                  onClick={() => {
-                    setEditing(i);
-                    setEditValue(String(i.total));
-                  }}
-                  aria-label={`Editar ${i.name}`}
-                >
-                  <Pencil className="h-5 w-5" />
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-11 w-11 text-destructive"
-                  onClick={() => setDeleting(i)}
-                  aria-label={`Excluir ${i.name}`}
-                >
-                  <Trash2 className="h-5 w-5" />
-                </Button>
-              </li>
-            ))}
-          </ul>
+          <>
+            {countingItems.length > 0 && (
+              <section className="space-y-1">
+                <h2 className="text-sm font-semibold text-amber-700 dark:text-amber-300 px-1">
+                  Contando — não salvos ({countingItems.length})
+                </h2>
+                <ul className="divide-y rounded-lg border border-amber-300/60 bg-card">
+                  {countingItems.map((i) => (
+                    <li key={i.key} className="flex items-center gap-1.5 p-3">
+                      <div className="min-w-0 flex-1">
+                        <div className={cn("font-medium leading-tight break-words", i.unknown && "text-amber-700 dark:text-amber-300")}>
+                          {i.name}
+                        </div>
+                        <div className="text-xs text-muted-foreground">
+                          <span className="font-mono">{i.barcode}</span> · {i.leituras} lanç. · {i.lastUser}
+                          {i.saved && <span> · recontagem (antes {formatQty(i.saved.quantidade)})</span>}
+                          {i.pending > 0 && <span className="text-amber-600"> · aguardando envio</span>}
+                        </div>
+                      </div>
+                      <div className="text-2xl font-bold tabular-nums w-12 text-right">{formatQty(i.total)}</div>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-11 w-10"
+                        onClick={() => {
+                          setEditing(i);
+                          setEditValue(String(i.total));
+                        }}
+                        aria-label={`Editar ${i.name}`}
+                      >
+                        <Pencil className="h-5 w-5" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-11 w-10 text-destructive"
+                        onClick={() => setDeleting(i)}
+                        aria-label={`Excluir ${i.name}`}
+                      >
+                        <Trash2 className="h-5 w-5" />
+                      </Button>
+                      <Button
+                        className="h-11 px-3 gap-1"
+                        onClick={() => save.mutate(i)}
+                        disabled={save.isPending}
+                        aria-label={`Salvar ${i.name}`}
+                      >
+                        <Save className="h-4 w-4" />
+                        <span className="hidden sm:inline">Salvar</span>
+                      </Button>
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            )}
+
+            {savedItems.length > 0 && (
+              <section className="space-y-1">
+                <h2 className="text-sm font-semibold text-success px-1">Salvos — saldo já atualizado ({savedItems.length})</h2>
+                <ul className="divide-y rounded-lg border bg-card">
+                  {savedItems.map((i) => (
+                    <li key={i.key} className="flex items-center gap-2 p-3">
+                      <CheckCircle2 className="h-5 w-5 text-success flex-shrink-0" />
+                      <div className="min-w-0 flex-1">
+                        <div className="font-medium leading-tight break-words">{i.name}</div>
+                        <div className="text-xs text-muted-foreground">
+                          <span className="font-mono">{i.barcode}</span> · por {i.saved?.by || "-"} às{" "}
+                          {i.saved ? formatDateTime(i.saved.at) : "-"}
+                        </div>
+                      </div>
+                      <div className="text-2xl font-bold tabular-nums w-14 text-right">
+                        {formatQty(i.saved?.quantidade)}
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            )}
+          </>
         )}
 
         <div className="hidden sm:flex justify-end pt-2">
@@ -415,9 +504,21 @@ export default function InventoryCountPage() {
           <ClipboardCheck className="h-6 w-6" />
           Conferência
         </Button>
-        <Button className="h-16 flex-1 text-lg gap-3" onClick={() => setCameraOpen(true)}>
-          <Camera className="h-7 w-7" />
+        <Button
+          variant="secondary"
+          className="h-16 w-24 flex-col gap-1 text-xs"
+          onClick={() => setCameraOpen(true)}
+        >
+          <Camera className="h-6 w-6" />
           Câmera
+        </Button>
+        <Button
+          className="h-16 flex-1 text-base gap-2"
+          onClick={() => lastItem && save.mutate(lastItem)}
+          disabled={!canSaveLast}
+        >
+          {save.isPending ? <Loader2 className="h-6 w-6 animate-spin" /> : <Save className="h-6 w-6" />}
+          Salvar produto
         </Button>
       </div>
 
@@ -436,7 +537,7 @@ export default function InventoryCountPage() {
       <Dialog open={!!editing} onOpenChange={(o) => !o && setEditing(null)}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Editar quantidade</DialogTitle>
+            <DialogTitle>Editar quantidade (não salva)</DialogTitle>
           </DialogHeader>
           <div className="space-y-2">
             <div className="font-medium">{editing?.name}</div>
@@ -476,8 +577,8 @@ export default function InventoryCountPage() {
           <AlertDialogHeader>
             <AlertDialogTitle>Excluir item da contagem?</AlertDialogTitle>
             <AlertDialogDescription>
-              {deleting?.name} ({formatQty(deleting?.total)} un) será removido da contagem. O produto passa a ser
-              considerado "não contado".
+              As leituras não salvas de {deleting?.name} ({formatQty(deleting?.total)} un) serão descartadas. Uma
+              contagem já salva deste produto não é alterada.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

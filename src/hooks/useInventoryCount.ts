@@ -27,11 +27,26 @@ export interface CountedItem {
   name: string;
   unknown: boolean;
   pendenteIdentificacao: boolean;
+  /** Quantidade da rodada aberta (ainda não salva). */
   total: number;
+  /** Há leituras não salvas deste produto. */
+  counting: boolean;
   leituras: number;
   lastAt: string;
   lastUser: string;
   pending: number;
+  /** Última contagem salva (saldo já atualizado no estoque). */
+  saved: { quantidade: number; at: string; by: string } | null;
+}
+
+export interface SaveResult {
+  product_name: string;
+  produto_criado: boolean;
+  contado: number;
+  movimentos_durante: number;
+  saldo_anterior: number;
+  saldo_novo: number;
+  diferenca: number;
 }
 
 const queueKey = (countId: string) => `fiorenza_inv_queue_${countId}`;
@@ -71,7 +86,7 @@ export function useInventoryCount(countId: string) {
   const { byId, findByBarcode } = catalog;
   const [queue, setQueue] = useState<PendingEntry[]>(() => loadQueue(countId));
   const [online, setOnline] = useState(() => navigator.onLine);
-  const flushing = useRef(false);
+  const flushing = useRef<Promise<void> | null>(null);
   const queueRef = useRef(queue);
   queueRef.current = queue;
 
@@ -136,39 +151,44 @@ export function useInventoryCount(countId: string) {
     [countId]
   );
 
-  const flush = useCallback(async () => {
-    if (flushing.current || queueRef.current.length === 0) return;
-    flushing.current = true;
+  const flush = useCallback((): Promise<void> => {
+    // Um envio por vez; quem chamar durante o envio aguarda o mesmo
+    if (flushing.current) return flushing.current;
+    if (queueRef.current.length === 0) return Promise.resolve();
     const deviceId = getDeviceId();
     const deviceLabel = getDeviceLabel();
-    try {
-      while (queueRef.current.length > 0) {
-        const e = queueRef.current[0];
-        const { error } = await supabase.rpc("register_count_entry", {
-          _id: e.id,
-          _count_id: e.count_id,
-          _barcode: e.barcode,
-          _quantidade: e.quantidade,
-          _tipo: e.tipo,
-          _device_id: deviceId,
-          _device_label: deviceLabel,
-          _client_created_at: e.client_created_at,
-        });
-        if (error && isNetworkError(error)) break;
-        if (error) {
-          toast({ title: "Lançamento recusado", description: dbErrorMessage(error), variant: "destructive" });
-          if (/CONTAGEM_FECHADA/.test(error.message)) {
-            updateQueue(() => []);
-            queryClient.invalidateQueries({ queryKey: ["inventory-count", countId] });
-            break;
+    const run = (async () => {
+      try {
+        while (queueRef.current.length > 0) {
+          const e = queueRef.current[0];
+          const { error } = await supabase.rpc("register_count_entry", {
+            _id: e.id,
+            _count_id: e.count_id,
+            _barcode: e.barcode,
+            _quantidade: e.quantidade,
+            _tipo: e.tipo,
+            _device_id: deviceId,
+            _device_label: deviceLabel,
+            _client_created_at: e.client_created_at,
+          });
+          if (error && isNetworkError(error)) break;
+          if (error) {
+            toast({ title: "Lançamento recusado", description: dbErrorMessage(error), variant: "destructive" });
+            if (/CONTAGEM_FECHADA/.test(error.message)) {
+              updateQueue(() => []);
+              queryClient.invalidateQueries({ queryKey: ["inventory-count", countId] });
+              break;
+            }
           }
+          updateQueue((q) => q.filter((x) => x.id !== e.id));
         }
-        updateQueue((q) => q.filter((x) => x.id !== e.id));
+      } finally {
+        flushing.current = null;
       }
-    } finally {
-      flushing.current = false;
-    }
-    queryClient.invalidateQueries({ queryKey: entriesKey });
+      await queryClient.invalidateQueries({ queryKey: entriesKey });
+    })();
+    flushing.current = run;
+    return run;
   }, [countId, entriesKey, queryClient, updateQueue]);
 
   // Sincroniza quando a conexão volta e periodicamente
@@ -205,22 +225,23 @@ export function useInventoryCount(countId: string) {
 
   const items = useMemo<CountedItem[]>(() => {
     const serverIds = new Set((entriesQuery.data || []).map((e) => e.id));
-    type Row = { id: string; barcode: string; product_id: string | null; quantidade: number; tipo: string; at: string; user: string; pending: boolean };
+    type Row = { barcode: string; product_id: string | null; quantidade: number; tipo: string; at: string; user: string; pending: boolean };
     const rows: Row[] = [
-      ...(entriesQuery.data || []).map((e) => ({
-        id: e.id,
-        barcode: e.barcode,
-        product_id: e.product_id,
-        quantidade: Number(e.quantidade),
-        tipo: e.tipo,
-        at: e.created_at,
-        user: e.user_nome,
-        pending: false,
-      })),
+      ...[...(entriesQuery.data || [])]
+        .sort((a, b) => (a.created_at < b.created_at ? -1 : a.created_at > b.created_at ? 1 : 0))
+        .map((e) => ({
+          barcode: e.barcode,
+          product_id: e.product_id,
+          quantidade: Number(e.quantidade),
+          tipo: e.tipo,
+          at: e.created_at,
+          user: e.user_nome,
+          pending: false,
+        })),
+      // Fila offline: sempre depois do que já está no servidor (rodada aberta)
       ...queue
         .filter((q) => !serverIds.has(q.id))
         .map((q) => ({
-          id: q.id,
           barcode: q.barcode,
           product_id: null,
           quantidade: q.quantidade,
@@ -231,13 +252,14 @@ export function useInventoryCount(countId: string) {
         })),
     ];
 
-    const map = new Map<string, CountedItem & { lastTipo: string }>();
+    type Acc = CountedItem & { lastTipo: string };
+    const map = new Map<string, Acc>();
     for (const r of rows) {
       const product = (r.product_id && byId.get(r.product_id)) || findByBarcode(r.barcode);
       const key = product?.id ?? `code:${r.barcode}`;
-      const cur =
-        map.get(key) ||
-        ({
+      let cur = map.get(key);
+      if (!cur) {
+        cur = {
           key,
           barcode: product?.barcode ?? r.barcode,
           productId: product?.id ?? null,
@@ -245,26 +267,55 @@ export function useInventoryCount(countId: string) {
           unknown: !product,
           pendenteIdentificacao: product?.pendente_identificacao ?? true,
           total: 0,
+          counting: false,
           leituras: 0,
           lastAt: r.at,
           lastUser: r.user,
           pending: 0,
-          lastTipo: r.tipo,
-        } as CountedItem & { lastTipo: string });
-      cur.total += r.quantidade;
-      cur.leituras += 1;
-      if (r.pending) cur.pending += 1;
+          saved: null,
+          lastTipo: "",
+        };
+        map.set(key, cur);
+      }
+      if (r.tipo === "SALVO") {
+        // Fecha a rodada: o que foi contado até aqui já está no estoque
+        cur.saved = { quantidade: cur.total, at: r.at, by: r.user };
+        cur.total = 0;
+        cur.leituras = 0;
+        cur.pending = 0;
+        cur.lastTipo = "SALVO";
+      } else {
+        cur.total += r.quantidade;
+        cur.leituras += 1;
+        if (r.pending) cur.pending += 1;
+        cur.lastTipo = r.tipo;
+      }
       if (r.at >= cur.lastAt) {
         cur.lastAt = r.at;
         cur.lastUser = r.user;
-        cur.lastTipo = r.tipo;
       }
-      map.set(key, cur);
     }
     return Array.from(map.values())
-      .filter((i) => i.lastTipo !== "EXCLUSAO" || i.total !== 0)
+      .map((i) => ({ ...i, counting: i.leituras > 0 && (i.lastTipo !== "EXCLUSAO" || i.total !== 0) }))
+      .filter((i) => i.counting || i.saved)
       .sort((a, b) => (a.lastAt < b.lastAt ? 1 : -1));
   }, [entriesQuery.data, queue, byId, findByBarcode]);
+
+  /** Salva a contagem do produto: o saldo é atualizado no estoque na hora. */
+  const saveItem = useCallback(
+    async (item: CountedItem): Promise<SaveResult> => {
+      await flush();
+      if (queueRef.current.some((q) => q.barcode === item.barcode || (item.productId && findByBarcode(q.barcode)?.id === item.productId))) {
+        throw new Error("Sem conexão: as leituras deste produto ainda não foram enviadas. Conecte para salvar.");
+      }
+      const { data, error } = await supabase.rpc("save_count_item", { _count_id: countId, _barcode: item.barcode });
+      if (error) throw error;
+      queryClient.invalidateQueries({ queryKey: entriesKey });
+      queryClient.invalidateQueries({ queryKey: ["stock-products"] });
+      return data as unknown as SaveResult;
+    },
+    [countId, entriesKey, findByBarcode, flush, queryClient]
+  );
 
   const setItemTotal = useCallback(
     (item: CountedItem, newTotal: number) => {
@@ -291,6 +342,7 @@ export function useInventoryCount(countId: string) {
     pendingCount: queue.length,
     online,
     addEntry,
+    saveItem,
     setItemTotal,
     removeItem,
     flush,

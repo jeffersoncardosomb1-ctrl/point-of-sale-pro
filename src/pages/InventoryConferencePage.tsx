@@ -41,7 +41,8 @@ import { formatBRL } from "@/lib/sales-utils";
 import { cn } from "@/lib/utils";
 
 type Tipo = "TOTAL" | "PARCIAL";
-type Filter = "todos" | "divergencias" | "nao_contados" | "a_identificar";
+type Filter = "todos" | "divergencias" | "nao_salvos" | "nao_contados" | "a_identificar";
+type Situacao = "SALVO" | "CONTANDO" | "NAO_CONTADO" | "ZERADO";
 
 interface ConfRow {
   key: string;
@@ -50,8 +51,13 @@ interface ConfRow {
   category: string;
   a_identificar: boolean;
   pendente: boolean;
+  /** Contado nesta contagem (salvo ou em contagem). */
   contado: boolean;
+  situacao: Situacao;
+  /** Ainda vai alterar o estoque (salvar pendente ou zerar no TOTAL). */
   ajusta: boolean;
+  movimentos_durante: number;
+  saved_by: string;
   saldo_sistema: number;
   quantidade_contada: number;
   diferenca: number;
@@ -101,8 +107,11 @@ export default function InventoryConferencePage() {
         category: r.category,
         a_identificar: r.a_identificar,
         pendente: r.pendente_identificacao,
-        contado: r.contado,
+        contado: r.situacao !== "NAO_CONTADO",
+        situacao: r.situacao as Situacao,
         ajusta: r.ajusta,
+        movimentos_durante: Number(r.movimentos_durante),
+        saved_by: r.saved_by_nome ?? "",
         saldo_sistema: Number(r.saldo_sistema),
         quantidade_contada: Number(r.quantidade_contada),
         diferenca: Number(r.diferenca),
@@ -132,8 +141,11 @@ export default function InventoryConferencePage() {
         category: "",
         a_identificar: r.a_identificar,
         pendente: r.a_identificar,
-        contado: r.contado,
-        ajusta: true,
+        contado: r.status === "SALVO",
+        situacao: r.status as Situacao,
+        ajusta: false,
+        movimentos_durante: Number(r.movimentos_durante),
+        saved_by: r.saved_by_nome,
         saldo_sistema: Number(r.saldo_sistema_no_fechamento),
         quantidade_contada: Number(r.quantidade_contada),
         diferenca: Number(r.diferenca),
@@ -149,29 +161,32 @@ export default function InventoryConferencePage() {
   );
 
   const totals = useMemo(() => {
-    let antes = 0;
-    let depois = 0;
+    let atual = 0; // estoque de hoje (já com os produtos salvos)
+    let depois = 0; // após encerrar (salvar pendentes e, no TOTAL, zerar não contados)
     let divergencia = 0;
     let divergentes = 0;
     let naoContados = 0;
     let aIdentificar = 0;
-    let contados = 0;
+    let salvos = 0;
+    let contando = 0;
     for (const r of rows) {
-      antes += Math.max(r.saldo_sistema, 0) * r.custo_medio;
-      depois += Math.max(r.ajusta ? r.quantidade_contada : r.saldo_sistema, 0) * r.custo_medio;
-      divergencia += r.valor_diferenca;
-      if (r.ajusta && r.diferenca !== 0) divergentes += 1;
-      if (!r.contado) naoContados += 1;
-      else contados += 1;
+      atual += Math.max(r.saldo_sistema, 0) * r.custo_medio;
+      depois += Math.max(r.ajusta ? r.saldo_sistema + r.diferenca : r.saldo_sistema, 0) * r.custo_medio;
+      if (r.contado || r.ajusta) divergencia += r.valor_diferenca;
+      if ((r.contado || r.ajusta) && r.diferenca !== 0) divergentes += 1;
+      if (r.situacao === "SALVO") salvos += 1;
+      if (r.situacao === "CONTANDO") contando += 1;
+      if (r.situacao === "NAO_CONTADO" || r.situacao === "ZERADO") naoContados += 1;
       if (r.a_identificar) aIdentificar += 1;
     }
-    return { antes, depois, divergencia, divergentes, naoContados, aIdentificar, contados };
+    return { atual, depois, divergencia, divergentes, naoContados, aIdentificar, salvos, contando };
   }, [rows]);
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
     return rows.filter((r) => {
-      if (filter === "divergencias" && !(r.ajusta && r.diferenca !== 0)) return false;
+      if (filter === "divergencias" && !((r.contado || r.ajusta) && r.diferenca !== 0)) return false;
+      if (filter === "nao_salvos" && r.situacao !== "CONTANDO") return false;
       if (filter === "nao_contados" && r.contado) return false;
       if (filter === "a_identificar" && !r.a_identificar) return false;
       if (q && !r.product_name.toLowerCase().includes(q) && !r.barcode.includes(q)) return false;
@@ -183,19 +198,23 @@ export default function InventoryConferencePage() {
     mutationFn: async () => {
       const { data, error } = await supabase.rpc("finalize_inventory", { _count_id: id, _tipo: tipo });
       if (error) throw error;
-      return data as { itens: number; divergencias: number; produtos_criados: number };
+      return data as { itens: number; divergencias: number; zerados: number };
     },
     onSuccess: (r) => {
       toast({
-        title: "Inventário finalizado",
-        description: `${r.itens} itens contados, ${r.divergencias} ajustes${r.produtos_criados ? `, ${r.produtos_criados} produto(s) a identificar criados` : ""}.`,
+        title: "Contagem encerrada",
+        description: `${r.itens} produto(s) salvos, ${r.divergencias} com ajuste${r.zerados ? `, ${r.zerados} zerado(s) por não terem sido contados` : ""}.`,
       });
       queryClient.invalidateQueries({ queryKey: ["inventory-count", id] });
       queryClient.invalidateQueries({ queryKey: ["inventory-counts"] });
       queryClient.invalidateQueries({ queryKey: ["stock-products"] });
     },
     onError: (err) => {
-      toast({ title: "Não foi possível finalizar", description: dbErrorMessage(err), variant: "destructive" });
+      toast({
+        title: "Não foi possível encerrar",
+        description: dbErrorMessage(err).replace(/^ITENS_NAO_SALVOS:\s*/, ""),
+        variant: "destructive",
+      });
       queryClient.invalidateQueries({ queryKey: ["inventory-count", id] });
     },
   });
@@ -231,10 +250,12 @@ export default function InventoryConferencePage() {
         Código: r.barcode,
         "Saldo sistema": r.saldo_sistema,
         Contado: r.contado ? r.quantidade_contada : "",
+        "Movimentado durante a contagem": r.movimentos_durante || "",
         Diferença: r.diferenca,
         "Custo médio": r.custo_medio,
         "Diferença R$": r.valor_diferenca,
-        Situação: r.a_identificar ? "A identificar" : r.contado ? "Contado" : "Não contado",
+        Situação: SITUACAO_LABEL[r.situacao] + (r.a_identificar ? " (a identificar)" : ""),
+        "Salvo por": r.saved_by,
       })),
       `inventario-${count?.numero ?? id}-conferencia`,
       format
@@ -258,7 +279,7 @@ export default function InventoryConferencePage() {
     );
   }
 
-  const valorAntes = finalized ? Number(count.valor_antes) : totals.antes;
+  const valorAntes = finalized ? Number(count.valor_antes) : totals.atual;
   const valorDepois = finalized ? Number(count.valor_depois) : totals.depois;
   const valorDiv = finalized ? Number(count.valor_divergencia) : totals.divergencia;
 
@@ -308,7 +329,7 @@ export default function InventoryConferencePage() {
                 <span>
                   <span className="font-semibold block">Parcial</span>
                   <span className="text-sm text-muted-foreground font-normal">
-                    Só os produtos contados são ajustados. Os demais mantêm o saldo.
+                    Só os produtos salvos são ajustados. Os demais mantêm o saldo.
                   </span>
                 </span>
               </Label>
@@ -320,7 +341,7 @@ export default function InventoryConferencePage() {
                 <span>
                   <span className="font-semibold block">Total</span>
                   <span className="text-sm text-muted-foreground font-normal">
-                    Produtos não contados ficam com saldo <strong>zero</strong>.
+                    Ao encerrar, produtos não salvos nesta contagem ficam com saldo <strong>zero</strong>.
                   </span>
                 </span>
               </Label>
@@ -331,17 +352,24 @@ export default function InventoryConferencePage() {
 
       {/* Totais */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <SummaryTile label="Valor do estoque antes" value={formatBRL(valorAntes)} />
-        <SummaryTile label="Valor do estoque depois" value={formatBRL(valorDepois)} />
         <SummaryTile
-          label="Valor das divergências"
+          label={finalized ? "Valor do estoque antes" : "Valor do estoque agora"}
+          value={formatBRL(valorAntes)}
+          hint={finalized ? undefined : "já com os produtos salvos"}
+        />
+        <SummaryTile
+          label={finalized ? "Valor do estoque depois" : "Valor após encerrar"}
+          value={formatBRL(valorDepois)}
+        />
+        <SummaryTile
+          label="Divergência da contagem"
           value={formatBRL(valorDiv)}
           tone={valorDiv < 0 ? "neg" : valorDiv > 0 ? "pos" : undefined}
         />
         <SummaryTile
-          label="Itens"
-          value={`${totals.contados} contados`}
-          hint={`${totals.divergentes} divergentes · ${totals.naoContados} não contados · ${totals.aIdentificar} a identificar`}
+          label="Produtos"
+          value={`${totals.salvos} ${totals.salvos === 1 ? "salvo" : "salvos"}`}
+          hint={`${totals.contando} não salvos · ${totals.divergentes} com diferença · ${totals.naoContados} não contados · ${totals.aIdentificar} a identificar`}
         />
       </div>
 
@@ -362,6 +390,7 @@ export default function InventoryConferencePage() {
             >
               <ToggleGroupItem value="todos" size="sm">Todos</ToggleGroupItem>
               <ToggleGroupItem value="divergencias" size="sm">Só divergências</ToggleGroupItem>
+              <ToggleGroupItem value="nao_salvos" size="sm">Não salvos</ToggleGroupItem>
               <ToggleGroupItem value="nao_contados" size="sm">Não contados</ToggleGroupItem>
               <ToggleGroupItem value="a_identificar" size="sm">A identificar</ToggleGroupItem>
             </ToggleGroup>
@@ -441,7 +470,7 @@ export default function InventoryConferencePage() {
                         </td>
                         <td className="px-3 py-2 text-right">{formatCost(r.custo_medio)}</td>
                         <td className={cn("px-3 py-2 text-right", r.valor_diferenca < 0 && "text-destructive", r.valor_diferenca > 0 && "text-success")}>
-                          {r.ajusta ? formatBRL(r.valor_diferenca) : "-"}
+                          {showsDiff(r) ? formatBRL(r.valor_diferenca) : "-"}
                         </td>
                         <td className="px-3 py-2">
                           <RowFlag r={r} />
@@ -468,16 +497,21 @@ export default function InventoryConferencePage() {
           <Button
             className="gap-2 h-12 sm:h-10"
             onClick={() => setConfirm("finalizar")}
-            disabled={finalize.isPending || liveQuery.isFetching}
+            disabled={finalize.isPending || liveQuery.isFetching || totals.contando > 0}
           >
             {finalize.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCheck className="h-4 w-4" />}
-            Finalizar inventário ({tipo === "TOTAL" ? "total" : "parcial"})
+            Encerrar contagem ({tipo === "TOTAL" ? "total" : "parcial"})
           </Button>
         </div>
       )}
+      {!closed && canManageStock && totals.contando > 0 && (
+        <p className="text-sm text-destructive text-right -mt-4 pb-6">
+          {totals.contando} produto(s) com leituras não salvas. Salve ou exclua na tela de contagem antes de encerrar.
+        </p>
+      )}
       {!closed && !canManageStock && (
         <p className="text-sm text-muted-foreground pb-6">
-          Somente administradores ou gerentes podem finalizar o inventário.
+          Cada produto salvo já atualizou o estoque. Somente administradores ou gerentes encerram a contagem.
         </p>
       )}
 
@@ -485,28 +519,30 @@ export default function InventoryConferencePage() {
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>
-              {confirm === "finalizar" ? "Finalizar inventário?" : "Cancelar contagem?"}
+              {confirm === "finalizar" ? "Encerrar contagem?" : "Cancelar contagem?"}
             </AlertDialogTitle>
             <AlertDialogDescription asChild>
               {confirm === "finalizar" ? (
                 <div className="space-y-2">
                   <p>
-                    Contagem <strong>{tipo === "TOTAL" ? "TOTAL" : "PARCIAL"}</strong>: {totals.divergentes} produto(s)
-                    terão o saldo ajustado, com divergência de <strong>{formatBRL(totals.divergencia)}</strong>.
+                    Os {totals.salvos} produto(s) salvos já estão com o saldo atualizado no estoque. Divergência total da
+                    contagem: <strong>{formatBRL(totals.divergencia)}</strong>.
                   </p>
-                  {tipo === "TOTAL" && totals.naoContados > 0 && (
+                  {tipo === "TOTAL" && totals.naoContados > 0 ? (
                     <p className="flex gap-2 text-destructive">
                       <AlertTriangle className="h-4 w-4 flex-shrink-0 mt-0.5" />
-                      {totals.naoContados} produto(s) não contados ficarão com saldo zero.
+                      Contagem TOTAL: {totals.naoContados} produto(s) não contados ficarão com saldo zero.
                     </p>
+                  ) : (
+                    <p>Contagem PARCIAL: produtos não contados mantêm o saldo atual.</p>
                   )}
-                  {totals.aIdentificar > 0 && (
-                    <p>{totals.aIdentificar} código(s) não cadastrados serão criados como "A IDENTIFICAR".</p>
-                  )}
-                  <p>Depois de finalizada, a contagem fica somente leitura.</p>
+                  <p>Depois de encerrada, a contagem fica somente leitura.</p>
                 </div>
               ) : (
-                <p>A contagem será cancelada sem alterar o estoque. Os lançamentos ficam guardados para consulta.</p>
+                <p>
+                  A contagem será cancelada. Produtos já salvos mantêm o saldo ajustado; leituras não salvas são
+                  descartadas. Os lançamentos ficam guardados para consulta.
+                </p>
               )}
             </AlertDialogDescription>
           </AlertDialogHeader>
@@ -519,7 +555,7 @@ export default function InventoryConferencePage() {
                 if (confirm === "cancelar" && !cancel.isPending) cancel.mutate();
               }}
             >
-              {confirm === "finalizar" ? "Finalizar" : "Cancelar contagem"}
+              {confirm === "finalizar" ? "Encerrar" : "Cancelar contagem"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -528,48 +564,66 @@ export default function InventoryConferencePage() {
   );
 }
 
+const SITUACAO_LABEL: Record<Situacao, string> = {
+  SALVO: "Salvo",
+  CONTANDO: "Não salvo",
+  NAO_CONTADO: "Não contado",
+  ZERADO: "Zerado (não contado)",
+};
+
+/** Mostra diferença quando o produto foi contado ou ainda vai ser ajustado ao encerrar. */
+const showsDiff = (r: ConfRow) => r.contado || r.ajusta || r.situacao === "ZERADO";
+
 function rowTone(r: ConfRow) {
-  if (r.a_identificar) return "bg-amber-50 dark:bg-amber-950/20";
-  if (r.ajusta && r.diferenca < 0) return "bg-destructive/5";
-  if (r.ajusta && r.diferenca > 0) return "bg-success/5";
+  if (r.situacao === "CONTANDO") return "bg-amber-50 dark:bg-amber-950/20";
+  if (showsDiff(r) && r.diferenca < 0) return "bg-destructive/5";
+  if (showsDiff(r) && r.diferenca > 0) return "bg-success/5";
   return "";
 }
 
 function DiffValue({ r, qtyOnly }: { r: ConfRow; qtyOnly?: boolean }) {
-  if (!r.ajusta) return <span className="text-muted-foreground">-</span>;
+  if (!showsDiff(r)) return <span className="text-muted-foreground">-</span>;
   const cls = r.diferenca < 0 ? "text-destructive font-semibold" : r.diferenca > 0 ? "text-success font-semibold" : "";
   return (
     <span className={cls}>
       {r.diferenca > 0 ? "+" : ""}
       {formatQty(r.diferenca)}
       {!qtyOnly && <span className="block text-xs">{formatBRL(r.valor_diferenca)}</span>}
+      {r.movimentos_durante !== 0 && (
+        <span className="block text-xs font-normal text-muted-foreground">
+          {r.movimentos_durante > 0 ? "+" : ""}
+          {formatQty(r.movimentos_durante)} mov. durante
+        </span>
+      )}
     </span>
   );
 }
 
 function RowFlag({ r }: { r: ConfRow }) {
-  if (r.a_identificar)
-    return (
-      <Badge variant="outline" className="border-amber-400 text-amber-700 whitespace-nowrap">
-        A identificar
-      </Badge>
-    );
-  if (!r.contado)
-    return (
-      <Badge variant="outline" className="text-muted-foreground whitespace-nowrap">
-        Não contado
-      </Badge>
-    );
-  if (r.diferenca !== 0)
-    return (
-      <Badge variant="outline" className="gap-1 whitespace-nowrap">
-        <ArrowLeftRight className="h-3 w-3" /> Divergente
-      </Badge>
-    );
+  const cls =
+    r.situacao === "SALVO"
+      ? "text-success border-success/30"
+      : r.situacao === "CONTANDO"
+        ? "border-amber-400 text-amber-700"
+        : r.situacao === "ZERADO"
+          ? "text-destructive border-destructive/30"
+          : "text-muted-foreground";
   return (
-    <Badge variant="outline" className="text-success border-success/30 whitespace-nowrap">
-      OK
-    </Badge>
+    <span className="inline-flex flex-wrap gap-1">
+      <Badge variant="outline" className={cn("whitespace-nowrap", cls)} title={r.saved_by ? `Salvo por ${r.saved_by}` : undefined}>
+        {SITUACAO_LABEL[r.situacao]}
+      </Badge>
+      {r.a_identificar && (
+        <Badge variant="outline" className="border-amber-400 text-amber-700 whitespace-nowrap">
+          A identificar
+        </Badge>
+      )}
+      {r.contado && r.diferenca !== 0 && (
+        <Badge variant="outline" className="gap-1 whitespace-nowrap">
+          <ArrowLeftRight className="h-3 w-3" /> Diferença
+        </Badge>
+      )}
+    </span>
   );
 }
 
